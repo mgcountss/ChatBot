@@ -12,6 +12,14 @@ mc.sendMessage("alive").catch((error) => {
     console.error(error);
 });
 
+let webhook1;
+let webhook2;
+
+try {
+    webhook1 = fs.readFileSync('./users/' + process.argv[2] + '/webhook1.txt', 'utf8');
+    webhook2 = fs.readFileSync('./users/' + process.argv[2] + '/webhook2.txt', 'utf8');
+} catch (err) { }
+
 console.log('Chatbot started')
 console.log("Connection Started");
 
@@ -37,7 +45,6 @@ process.on('message', (message) => {
     }
 });
 
-const webhookURL = 'https://discord.com/api/webhooks/1121515631955689602/djrgaGHrq3WfRGAnihmBaKVqwPb_5OUAXGbSXcEjzds5snu0PbPD09M8-yW-N4tOGD6g';
 mc.on("actions", async (chats) => {
     chats = chats.sort((a, b) => a.timestampUsec - b.timestampUsec);
     let ids = await db.getOne(process.argv[2], 'ids');
@@ -54,14 +61,16 @@ mc.on("actions", async (chats) => {
                 let a = new Date();
                 await logMessage(chat, users, moderation, messages, ids, stream, giveaway, settings, counting);
                 let b = new Date();
-                console.log("logMessage took", (b - a)/1000, "seconds", chat.rawMessage);
+                console.log("logMessage took", (b - a) / 1000, "seconds", chat.rawMessage);
             } else if (chat.type === 'moderationMessageAction' && process.argv[2] === "UCSgk1g0AZi9_759yfz-iIHg") {
-                if (chat.message) {
-                    const modifiedMessage = stringify(chat.message).replace(/@/g, 'ï¼ ');
-                    await sendMessageToWebhook(webhookURL, modifiedMessage);
-                } else {
-                    const deletedMessage = 'Deleted message: ' + stringify(messages.find(x => x.targetId === chat.id).rawMessage);
-                    await sendMessageToWebhook(webhookURL, deletedMessage);
+                if (process.argv[2] == "UCSgk1g0AZi9_759yfz-iIHg") {
+                    if (chat.message) {
+                        const modifiedMessage = stringify(chat.message).replace(/@/g, 'ï¼ ');
+                        await sendMessageToWebhook(webhook2, modifiedMessage);
+                    } else {
+                        const deletedMessage = 'Deleted message: ' + stringify(messages.find(x => x.targetId === chat.id).rawMessage);
+                        await sendMessageToWebhook(webhook2, deletedMessage);
+                    }
                 }
                 db.addObject(process.argv[2], 'ids', chat.id);
             }
@@ -301,7 +310,7 @@ async function logMessage(chat, users, moderation, messages, ids, stream, giveaw
             db.overwriteOne(process.argv[2], 'stream', stream);
             if (process.argv[2] == "UCSgk1g0AZi9_759yfz-iIHg") {
                 let msg = chat.message.replace(/@/g, 'ï¼ ')
-                fetch('https://discord.com/api/webhooks/1100829744452341891/bK1ADRZY4yLClXdgZnSQ8NHY_1lS3DdySeLkRPg7A18FR3MFrqa14Q-0RCEJ5RrYVuKn', {
+                fetch(webhook1, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
