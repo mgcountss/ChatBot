@@ -1,0 +1,345 @@
+<html>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootswatch/4.5.2/darkly/bootstrap.min.css">
+<link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;1,400&amp;display=swap">
+<script src="./odometer.js"></script>
+<link rel="stylesheet" href="./odometer.css" />
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+<style>
+    .name {
+        margin-left: 20px;
+    }
+
+    tr:hover {
+        cursor: pointer;
+    }
+
+    #go {
+        height: 100px;
+        width: 400px;
+        font-size: 40px;
+    }
+
+    #autocomplete,
+    #autocomplete2 {
+        height: 50px;
+        width: 1000px;
+        border-radius: 10px;
+        background-color: #494949
+    }
+
+    #autocomplete::placeholder,
+    #autocomplete2::placeholder {
+        color: #FFFFFF
+    }
+
+    .ui-menu-item-wrapper {
+        background-color: #494949;
+    }
+</style>
+<center>
+    <a href="./edit" style="font-size: 4vw;">Connect Your Account!</a><br>
+    <h3>Connecting your account allows you to get a verified badge as well</h3>
+    <h3>as send commands via the site instead of having to use the stream chat</h3>
+    <hr>
+    <a href="./compare/search" style="font-size: 4vw;">Compare</a><br>
+    <hr style="background-color: #FFF;">
+    <h1 style="font-size: 2vw;">Total Users</h1>
+    <h1 style="font-size: 4vw;" class="odometer" id="total">0</h1>
+    <hr style="background-color: #FFF;">
+    <label for="autocomplete" style="color: #FFFFFF; font-size: 50px;" id="margin">Search</label>
+    <br>
+    <input id="autocomplete" style="color: #FFFFFF;" placeholder="Search Term">
+    <button onclick="search()">Search</button>
+    <hr style="background-color: #FFF;">
+</center>
+<div class="table-responsive" style="border-style: none;">
+    <table class="table table-striped table-dark table-sm">
+        <thead>
+            <tr>
+                <th style="border-style: solid;border-right-style: solid;" onclick="sortData('name')">Name</th>
+                <th style="border-style: solid;" onclick="sortData('subs')">Subscribers</th>
+                <th style="border-style: solid;" onclick="sortData('commands')">Commands</th>
+                <th style="border-style: solid;" onclick="sortData('uploads')">Videos</th>
+                <th style="border-style: solid;" onclick="sortData('shorts')">Shorts</th>
+                <th style="border-style: solid;" onclick="sortData('streams')">Streams</th>
+                <th style="border-style: solid;" onclick="sortData('songs')">Songs</th>
+                <th style="border-style: solid;" onclick="sortData('comments')">Comments</th>
+                <th style="border-style: solid;" onclick="sortData('playlist')">Playlists</th>
+                <th style="border-style: solid;" onclick="sortData('posts')">Posts</th>
+                <th style="border-style: solid;" onclick="sortData('stories')">Stories</th>
+                <th style="border-style: solid;" onclick="sortData('podcasts')">Podcasts</th>
+                <th style="border-style: solid;" onclick="sortData('views')">Views</th>
+                <th style="border-style: solid;" onclick="sortData('likes')">Likes</th>
+                <th style="border-style: solid;" onclick="sortData('dislikes')">Dislikes</th>
+                <th style="border-style: solid;" onclick="sortData('commentCount')">Comments (received)</th>
+            </tr>
+        </thead>
+        <tbody style="border-style: none;" class="counters"></tbody>
+    </table>
+</div>
+<script>
+    var pastData = []
+    let tags = []
+    var sort = 'subs_up'
+
+    function search() {
+        let search = $('#autocomplete').val()
+        document.querySelectorAll('strong').forEach((strong) => {
+            if (strong.innerHTML.toLowerCase().includes(search.toLowerCase())) {
+                let id = strong.getAttribute('cid')
+                window.location.href = "/user?id=" + id
+            }
+        })
+    }
+
+    function load() {
+        $('.counters').html('')
+        $.getJSON("/all", (data) => {
+            for (var q = 0; q < data.length; q++) {
+                tags[q] = data[q].name
+            }
+            total.innerHTML = data.length
+            let sortBy = sort.split('_')[0]
+            let sortDir = sort.split('_')[1]
+            if (sortDir == 'up') {
+                data.sort((a, b) => {
+                    return b[sortBy] - a[sortBy]
+                })
+            } else {
+                data.sort((a, b) => {
+                    return a[sortBy] - b[sortBy]
+                })
+            }
+            pastData = data
+            for (var q = 0; q < data.length; q++) {
+                let verified = ""
+                if (data[q].verified == true) {
+                    verified = `<img src="./verified.png" style="width: 20px;height: 20px;">`
+                }
+                var htmlcard = `<tr onclick="ee(this)" id="tr_${q}" cid="${data[q].cid}">
+                    <td style="border-right-style: solid;border-left-style: solid;" cid="${data[q].cid}">
+                        <img style="width: 40px;height: 40px;" id="img_${q}" src="${data[q].image}" cid="${data[q].cid}">
+                        <strong id="name_${q}" class="name" cid="${data[q].cid}">${data[q].name}</strong>${verified}</td>
+                        <td id="subs_${q}" cid="${data[q].cid}">${Math.floor(data[q].subs).toLocaleString()}</td>
+                        <td id="commands_${q}" cid="${data[q].cid}">${data[q].commands.toLocaleString()}</td>
+                        <td id="videos_${q}" cid="${data[q].cid}">${data[q].videos.toLocaleString()}</td>
+                        <td id="shorts_${q}" cid="${data[q].cid}">${data[q].shorts.toLocaleString()}</td>
+                        <td id="streams_${q}" cid="${data[q].cid}">${data[q].streams.toLocaleString()}</td>
+                        <td id="songs_${q}" cid="${data[q].cid}">${data[q].songs.toLocaleString()}</td>
+                        <td id="comments_${q}" cid="${data[q].cid}">${data[q].comments.toLocaleString()}</td>
+                        <td id="playlists_${q}" cid="${data[q].cid}">${data[q].playlists.toLocaleString()}</td>
+                        <td id="posts_${q}" cid="${data[q].cid}">${data[q].posts.toLocaleString()}</td>
+                        <td id="stories_${q}" cid="${data[q].cid}">${data[q].stories.toLocaleString()}</td>
+                        <td id="podcasts_${q}" cid="${data[q].cid}">${data[q].podcasts.toLocaleString()}</td>
+                        <td id="views_${q}" cid="${data[q].cid}">${Math.floor(data[q].views).toLocaleString()}</td>
+                        <td id="likes_${q}" cid="${data[q].cid}">${Math.floor(data[q].likes).toLocaleString()}</td>
+                        <td id="dislikes_${q}" cid="${data[q].cid}">${Math.floor(data[q].dislikes).toLocaleString()}</td>
+                        <td id="commentCount_${q}" cid="${data[q].cid}">${Math.floor(data[q].commentCount).toLocaleString()}</td>
+                    </tr>`;
+                $('.counters').append(htmlcard)
+            }
+        })
+    }
+    load()
+    setInterval(load, 30000)
+
+    function ee(elmnt) {
+        window.location.href = "/user?id=" + elmnt.getAttribute("cid") + "";
+    }
+
+    function sortData(by) {
+        if (by == 'commands') {
+            if (sort == 'commands_up') {
+                sort = 'commands_down'
+                pastData.sort((a, b) => (a.commands > b.commands) ? 1 : -1)
+            } else {
+                sort = 'commands_up'
+                pastData.sort((a, b) => (a.commands < b.commands) ? 1 : -1)
+            }
+        } else if (by == 'subs') {
+            if (sort == 'subs_up') {
+                sort = 'subs_down'
+                pastData.sort((a, b) => (a.subs > b.subs) ? 1 : -1)
+            } else {
+                sort = 'subs_up'
+                pastData.sort((a, b) => (a.subs < b.subs) ? 1 : -1)
+            }
+        } else if (by == 'uploads') {
+            if (sort == 'uploads_up') {
+                sort = 'uploads_down'
+                pastData.sort((a, b) => (a.uploads > b.uploads) ? 1 : -1)
+            } else {
+                sort = 'uploads_up'
+                pastData.sort((a, b) => (a.uploads < b.uploads) ? 1 : -1)
+            }
+        } else if (by == 'comments') {
+            if (sort == 'comments_up') {
+                sort = 'comments_down'
+                pastData.sort((a, b) => (a.comments > b.comments) ? 1 : -1)
+            } else {
+                sort = 'comments_up'
+                pastData.sort((a, b) => (a.comments < b.comments) ? 1 : -1)
+            }
+        } else if (by == 'playlist') {
+            if (sort == 'playlist_up') {
+                sort = 'playlist_down'
+                pastData.sort((a, b) => (a.playlists > b.playlists) ? 1 : -1)
+            } else {
+                sort = 'playlist_up'
+                pastData.sort((a, b) => (a.playlists < b.playlists) ? 1 : -1)
+            }
+        } else if (by == 'posts') {
+            if (sort == 'posts_up') {
+                sort = 'posts_down'
+                pastData.sort((a, b) => (a.posts > b.posts) ? 1 : -1)
+            } else {
+                sort = 'posts_up'
+                pastData.sort((a, b) => (a.posts < b.posts) ? 1 : -1)
+            }
+        } else if (by == 'name') {
+            if (sort == 'name_up') {
+                sort = 'name_down'
+                pastData.sort((a, b) => (a.name > b.name) ? 1 : -1)
+            } else {
+                sort = 'name_up'
+                pastData.sort((a, b) => (a.name < b.name) ? 1 : -1)
+            }
+        } else if (by == 'videos') {
+            if (sort == 'videos_up') {
+                sort = 'videos_down'
+                pastData.sort((a, b) => (a.videos > b.videos) ? 1 : -1)
+            } else {
+                sort = 'videos_up'
+                pastData.sort((a, b) => (a.videos < b.videos) ? 1 : -1)
+            }
+        } else if (by == 'shorts') {
+            if (sort == 'shorts_up') {
+                sort = 'shorts_down'
+                pastData.sort((a, b) => (a.shorts > b.shorts) ? 1 : -1)
+            } else {
+                sort = 'shorts_up'
+                pastData.sort((a, b) => (a.shorts < b.shorts) ? 1 : -1)
+            }
+        } else if (by == 'streams') {
+            if (sort == 'streams_up') {
+                sort = 'streams_down'
+                pastData.sort((a, b) => (a.streams > b.streams) ? 1 : -1)
+            } else {
+                sort = 'streams_up'
+                pastData.sort((a, b) => (a.streams < b.streams) ? 1 : -1)
+            }
+        } else if (by == 'songs') {
+            if (sort == 'songs_up') {
+                sort = 'songs_down'
+                pastData.sort((a, b) => (a.songs > b.songs) ? 1 : -1)
+            } else {
+                sort = 'songs_up'
+                pastData.sort((a, b) => (a.songs < b.songs) ? 1 : -1)
+            }
+        } else if (by == 'stories') {
+            if (sort == 'stories_up') {
+                sort = 'stories_down'
+                pastData.sort((a, b) => (a.stories > b.stories) ? 1 : -1)
+            } else {
+                sort = 'stories_up'
+                pastData.sort((a, b) => (a.stories < b.stories) ? 1 : -1)
+            }
+        } else if (by == 'podcasts') {
+            if (sort == 'podcasts_up') {
+                sort = 'podcasts_down'
+                pastData.sort((a, b) => (a.podcasts > b.podcasts) ? 1 : -1)
+            } else {
+                sort = 'podcasts_up'
+                pastData.sort((a, b) => (a.podcasts < b.podcasts) ? 1 : -1)
+            }
+        } else if (by == 'views') {
+            if (sort == 'views_up') {
+                sort = 'views_down'
+                pastData.sort((a, b) => (a.views > b.views) ? 1 : -1)
+            } else {
+                sort = 'views_up'
+                pastData.sort((a, b) => (a.views < b.views) ? 1 : -1)
+            }
+        } else if (by == 'likes') {
+            if (sort == 'likes_up') {
+                sort = 'likes_down'
+                pastData.sort((a, b) => (a.likes > b.likes) ? 1 : -1)
+            } else {
+                sort = 'likes_up'
+                pastData.sort((a, b) => (a.likes < b.likes) ? 1 : -1)
+            }
+        } else if (by == 'dislikes') {
+            if (sort == 'dislikes_up') {
+                sort = 'dislikes_down'
+                pastData.sort((a, b) => (a.dislikes > b.dislikes) ? 1 : -1)
+            } else {
+                sort = 'dislikes_up'
+                pastData.sort((a, b) => (a.dislikes < b.dislikes) ? 1 : -1)
+            }
+        } else if (by == 'commentCount') {
+            if (sort == 'commentCount_up') {
+                sort = 'commentCount_down'
+                pastData.sort((a, b) => (a.commentCount > b.commentCount) ? 1 : -1)
+            } else {
+                sort = 'commentCount_up'
+                pastData.sort((a, b) => (a.commentCount < b.commentCount) ? 1 : -1)
+            }
+        }
+        $('.counters').html('')
+        data = pastData
+        for (var q = 0; q < data.length; q++) {
+            let verified = ""
+            if (data[q].verified == true) {
+                verified = `<img src="./verified.png" style="width: 20px;height: 20px;">`
+            }
+            var htmlcard = `<tr onclick="ee(this)" id="tr_${q}" cid="${data[q].cid}">
+                    <td style="border-right-style: solid;border-left-style: solid;" cid="${data[q].cid}">
+                        <img style="width: 40px;height: 40px;" id="img_${q}" src="${data[q].image}" cid="${data[q].cid}">
+                        <strong id="name_${q}" class="name" cid="${data[q].cid}">${data[q].name}</strong>${verified}</td>
+                        <td id="subs_${q}" cid="${data[q].cid}">${Math.floor(data[q].subs).toLocaleString()}</td>
+                        <td id="commands_${q}" cid="${data[q].cid}">${data[q].commands.toLocaleString()}</td>
+                        <td id="videos_${q}" cid="${data[q].cid}">${data[q].videos.toLocaleString()}</td>
+                        <td id="shorts_${q}" cid="${data[q].cid}">${data[q].shorts.toLocaleString()}</td>
+                        <td id="streams_${q}" cid="${data[q].cid}">${data[q].streams.toLocaleString()}</td>
+                        <td id="songs_${q}" cid="${data[q].cid}">${data[q].songs.toLocaleString()}</td>
+                        <td id="comments_${q}" cid="${data[q].cid}">${data[q].comments.toLocaleString()}</td>
+                        <td id="playlists_${q}" cid="${data[q].cid}">${data[q].playlists.toLocaleString()}</td>
+                        <td id="posts_${q}" cid="${data[q].cid}">${data[q].posts.toLocaleString()}</td>
+                        <td id="stories${q}" cid="${data[q].cid}">${data[q].stories.toLocaleString()}</td>
+                        <td id="podcasts_${q}" cid="${data[q].cid}">${data[q].podcasts.toLocaleString()}</td>
+                        <td id="views_${q}" cid="${data[q].cid}">${Math.floor(data[q].views).toLocaleString()}</td>
+                        <td id="likes_${q}" cid="${data[q].cid}">${Math.floor(data[q].likes).toLocaleString()}</td>
+                        <td id="dislikes_${q}" cid="${data[q].cid}">${Math.floor(data[q].dislikes).toLocaleString()}</td>
+                        <td id="commentCount_${q}" cid="${data[q].cid}">${Math.floor(data[q].commentCount).toLocaleString()}</td>
+                    </tr>`;
+            $('.counters').append(htmlcard)
+        }
+
+    }
+
+    $("#autocomplete").autocomplete({
+        source: function (request, response) {
+            var matcher = new RegExp("^" + $.ui.autocomplete.escapeRegex(request.term), "i");
+            response($.grep(tags, function (item) {
+                return matcher.test(item);
+            }));
+        }
+    });
+
+    var disqus_config = function () {
+        this.page.url = "https://mgcounts.github.io/a";  // Replace PAGE_URL with your page's canonical URL variable
+        this.page.identifier = "https://mgcounts.github.io/a"; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+    };
+
+    (function () { // DON'T EDIT BELOW THIS LINE
+        var d = document, s = d.createElement('script');
+        s.src = 'https://mgcounts.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+<br>
+<div id="disqus_thread"></div>

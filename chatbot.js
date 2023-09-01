@@ -8,9 +8,9 @@ console.log('Starting chatbot...')
 
 let credentials = JSON.parse(fs.readFileSync('./users/' + process.argv[2] + '/credentials.json'));
 const mc = await Masterchat.init(process.argv[3], { credentials });
-mc.sendMessage("alive").catch((error) => {
-    console.error(error);
-});
+//mc.sendMessage("alive").catch((error) => {
+ //   console.error(error);
+//});
 
 let webhook1;
 let webhook2;
@@ -45,23 +45,41 @@ process.on('message', (message) => {
     }
 });
 
+let batch = {
+    "ids": [],
+    "messages": [],
+    "users": [],
+    "moderation": {},
+    "stream": {},
+    "giveaway": {},
+    "settings": {},
+    "counting": {},
+    "commands": [],
+    "votes": [],
+    "connection": {},
+}
+
 mc.on("actions", async (chats) => {
     chats = chats.sort((a, b) => a.timestampUsec - b.timestampUsec);
-    let ids = await db.getOne(process.argv[2], 'ids');
-    let messages = await db.getOne(process.argv[2], 'messages');
-    let users = await db.getOne(process.argv[2], 'users');
-    let moderation = await db.getOne(process.argv[2], 'moderation');
-    let stream = await db.getOne(process.argv[2], 'stream');
-    let giveaway = await db.getOne(process.argv[2], 'giveaway');
-    let settings = await db.getOne(process.argv[2], 'settings');
-    let counting = await db.getOne(process.argv[2], 'counting');
+    batch.ids = await db.getOne(process.argv[2], 'ids');
+    batch.messages = await db.getOne(process.argv[2], 'messages');
+    batch.users = await db.getOne(process.argv[2], 'users');
+    batch.moderation = await db.getOne(process.argv[2], 'moderation');
+    batch.stream = await db.getOne(process.argv[2], 'stream');
+    batch.giveaway = await db.getOne(process.argv[2], 'giveaway');
+    batch.settings = await db.getOne(process.argv[2], 'settings');
+    batch.counting = await db.getOne(process.argv[2], 'counting');
+    batch.commands = await db.getOne(process.argv[2], 'commands');
+    batch.votes = await db.getOne(process.argv[2], 'votes');
+    batch.connection = await db.getOne(process.argv[2], 'connection');
+    let { ids, messages } = JSON.parse(JSON.stringify(batch));
     for (const chat of chats) {
         if (!ids.includes(chat.id)) {
             if (chat.type === 'addChatItemAction') {
                 let a = new Date();
-                await logMessage(chat, users, moderation, messages, ids, stream, giveaway, settings, counting);
+                await logMessage(chat);
                 let b = new Date();
-                console.log("logMessage took", (b - a) / 1000, "seconds", chat.rawMessage);
+                console.log("process took ", (b - a) / 1000, "seconds", chat.rawMessage.toString());
             } else if (chat.type === 'moderationMessageAction' && process.argv[2] === "UCSgk1g0AZi9_759yfz-iIHg") {
                 if (process.argv[2] == "UCSgk1g0AZi9_759yfz-iIHg") {
                     if (chat.message) {
@@ -92,42 +110,18 @@ async function sendMessageToWebhook(url, content) {
     } catch (err) { }
 }
 
-async function handleCounting(chat) {
-    console.log("handleCounting", chat.rawMessage);
-    let counting = await db.getOne(process.argv[2], 'counting');
-    counting.messages.push(chat);
-    if (counting.messages.length + 1 > 50) {
-        counting.messages.shift();
-    }
-    counting.number++;
-    counting.lastMSG = chat.timestampUsec;
-    db.overwriteOne(process.argv[2], 'counting', counting);
-    if (counting.users) {
-        let found = false;
-        for (let i = 0; i < counting.users.length; i++) {
-            if (counting.users[i].id == chat.authorChannelId) {
-                counting.users[i].count++;
-                counting.users[i].name = chat.authorName;
-                counting.users[i].image = chat.authorPhoto;
-                found = true;
-                db.editWithinArray(process.argv[2], 'counting', 'id', chat.authorChannelId, 'count', counting.users[i].count);
-                db.editWithinArray(process.argv[2], 'counting', 'id', chat.authorChannelId, 'name', chat.authorName);
-                db.editWithinArray(process.argv[2], 'counting', 'id', chat.authorChannelId, 'image', chat.authorPhoto);
-                break;
-            }
-        }
-        if (found == false) {
-            db.pushToArray(process.argv[2], 'counting', 'users', {
-                id: chat.authorChannelId,
-                name: chat.authorName,
-                image: chat.authorPhoto,
-                count: 1
-            });
-        }
+function checkmilestone(num) {
+    num = parseInt(num);
+    if (num % 100 == 0) {
+        return true;
+    } else {
+        return false;
     }
 }
 
-async function logMessage(chat, users, moderation, messages, ids, stream, giveaway, settings, counting) {
+async function logMessage(chat) {
+    let a = new Date();
+    let { users, moderation, messages, ids, stream, giveaway, settings, counting } = JSON.parse(JSON.stringify(batch));
     let found = false;
     let respond = true;
     if (users && moderation && messages && ids && stream && giveaway && settings) {
@@ -172,6 +166,11 @@ async function logMessage(chat, users, moderation, messages, ids, stream, giveaw
                                 message: chat.message,
                                 timestamp: chat.timestampUsec,
                             });
+                            batch.moderation.actions.push({
+                                type: 'messagesPer10Seconds',
+                                message: chat.message,
+                                timestamp: chat.timestampUsec
+                            });
                             db.pushToArray(process.argv[2], 'moderation', 'actions', {
                                 type: 'messagesPer10Seconds',
                                 message: chat.message,
@@ -180,6 +179,7 @@ async function logMessage(chat, users, moderation, messages, ids, stream, giveaw
                             msgs.push(chat.id);
                             for (let i = 0; i < msgs.length; i++) {
                                 db.pushToArray(process.argv[2], 'moderation', 'checked10', msgs[i]);
+                                batch.moderation.checked10.push(msgs[i]);
                             }
                             if (userFound.warns.length < moderation.warnsBeforeTimeout) {
                                 sendMSG(`@${userFound.name} was warned for spamming (${userFound.warns.length}/${moderation.warnsBeforeTimeout})`);
@@ -220,9 +220,15 @@ async function logMessage(chat, users, moderation, messages, ids, stream, giveaw
                                 message: chat.message,
                                 timestamp: chat.timestampUsec
                             });
+                            batch.moderation.actions.push({
+                                type: 'messagesPerMinute',
+                                message: chat.message,
+                                timestamp: chat.timestampUsec
+                            });
                             msgs.push(chat.id);
                             for (let i = 0; i < msgs.length; i++) {
                                 db.pushToArray(process.argv[2], 'moderation', 'checked60', msgs[i]);
+                                batch.moderation.checked60.push(msgs[i]);
                             }
                             if (userFound.warns.length < moderation.warnsBeforeTimeout) {
                                 sendMSG(`@${userFound.name} was warned for spamming (${userFound.warns.length}/${moderation.warnsBeforeTimeout})`);
@@ -232,6 +238,11 @@ async function logMessage(chat, users, moderation, messages, ids, stream, giveaw
                     if (userFound.warns.length >= moderation.warnsBeforeTimeout) {
                         sendMSG(`@${userFound.name} was put in timeout`);
                         db.pushToArray(process.argv[2], 'moderation', 'actions', {
+                            type: 'timeout',
+                            message: `@${userFound.name} was put in timeout`,
+                            timestamp: chat.timestampUsec,
+                        });
+                        batch.moderation.actions.push({
                             type: 'timeout',
                             message: `@${userFound.name} was put in timeout`,
                             timestamp: chat.timestampUsec,
@@ -255,10 +266,15 @@ async function logMessage(chat, users, moderation, messages, ids, stream, giveaw
                 userFound.name = chat.authorName.replace(/</g, 'â®').replace(/>/g, 'â¯');
                 userFound.photo = chat.authorPhoto;
                 userFound.lastMSG = parseFloat(chat.timestampUsec);
+                for (let i = 0; i < batch.users.length; i++) {
+                    if (batch.users[i].id == userFound.id) {
+                        batch.users[i] = userFound;
+                    }
+                }
                 db.overwriteObjectInArray(process.argv[2], 'users', 'id', userId, userFound);
             }
             if (!found) {
-                db.addObject(process.argv[2], 'users', {
+                let obj = {
                     id: chat.authorChannelId,
                     messages: 1,
                     lastMSG: parseFloat(chat.timestampUsec),
@@ -279,7 +295,9 @@ async function logMessage(chat, users, moderation, messages, ids, stream, giveaw
                     blacklist: [],
                     hourlyStats: {},
                     dailyStats: {}
-                });
+                };
+                db.addObject(process.argv[2], 'users', obj);
+                batch.users.push(obj);
             }
             chat.message = (stringify(chat.message)).replace(/</g, "â®").replace(/>/g, "â¯")
             chat.authorName = (stringify(chat.authorName)).replace(/</g, "â®").replace(/>/g, "â¯")
@@ -301,13 +319,18 @@ async function logMessage(chat, users, moderation, messages, ids, stream, giveaw
             }
             db.addObject(process.argv[2], 'messages', chat);
             db.addObject(process.argv[2], 'ids', chat.id);
+            batch.messages.push(chat);
+            batch.ids.push(chat.id);
             if (ids.length + 1 > 100) {
                 db.removeFirstObject(process.argv[2], 'ids');
+                batch.ids.shift();
             }
             if (messages.length + 1 > 500) {
                 db.removeFirstObject(process.argv[2], 'messages');
+                batch.messages.shift();
             }
             db.overwriteOne(process.argv[2], 'stream', stream);
+            batch.stream = stream;
             if (process.argv[2] == "UCSgk1g0AZi9_759yfz-iIHg") {
                 let msg = chat.message.replace(/@/g, 'ï¼ ')
                 fetch(webhook1, {
@@ -328,9 +351,13 @@ async function logMessage(chat, users, moderation, messages, ids, stream, giveaw
                     let cmd = false;
                     for (let i = 0; i < commands.length; i++) {
                         if ((stringify(chat.message).split(' ')[0].toLowerCase()) == ((commands[i].command.toLowerCase()))) {
-                            return await handleCommand(chat, commands[i], i);
+                            let b = new Date();
+                            console.log("logMessage took ", (b - a) / 1000, "seconds", chat.rawMessage.toString());
+                            return await handleCommand(chat, commands[i]);
                         } else if (commands[i].command.toLowerCase() == stringify(chat.message).toLowerCase()) {
-                            return await handleCommand(chat, commands[i], i);
+                            let b = new Date();
+                            console.log("logMessage took ", (b - a) / 1000, "seconds", chat.rawMessage.toString());
+                            return await handleCommand(chat, commands[i]);
                         }
                     }
                     if (cmd == false) {
@@ -346,6 +373,8 @@ async function logMessage(chat, users, moderation, messages, ids, stream, giveaw
                         if (stringify(chat.message).startsWith('!')) {
                             chat.message = stringify(chat.message);
                             chat.message = chat.message.replace('!', '!vote ');
+                            let b = new Date();
+                            console.log("logMessage took ", (b - a) / 1000, "seconds", chat.rawMessage.toString());
                             return await handleCommand(chat, {
                                 "command": "!vote",
                                 "response": "{authorName} {ifBlock {authorCustomRole}} voted for {vote {query}} ({math {voteCount {query}} + 1})",
@@ -353,120 +382,22 @@ async function logMessage(chat, users, moderation, messages, ids, stream, giveaw
                                 "cooldown": 30,
                                 "default": true,
                                 "id": "8tuf4g"
-                            }, 10);
+                            });
                         }
                     }
                 }
             }
         }
     }
+    let b = new Date();
+    console.log("logMessage took ", (b - a) / 1000, "seconds", chat.rawMessage.toString());
     return "";
 }
 
-function checkmilestone(num) {
-    num = parseInt(num);
-    if (num % 100 == 0) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-let lastMinute = new Date().getMinutes();
-setInterval(async () => {
-    let minutes = new Date().getMinutes();
-    if (minutes % 5 == 0 && lastMinute != minutes) {
-        lastMinute = minutes;
-        let pointGainers = [];
-        let milestoneMessages = [];
-        let users = await db.getOne(process.argv[2], 'users');
-        let settings = await db.getOne(process.argv[2], 'settings');
-        if (settings.currency.enabled == true) {
-            for (let i = 0; i < users.length; i++) {
-                if (users[i].active == true) {
-                    if ((users[i].id != "UCL6_4AyDYTpn_lfF227ur9w")) {
-                        users[i].points = (parseFloat(users[i].points) + 1)
-                        users[i].active = false;
-                        if (checkmilestone(parseInt(users[i].points))) {
-                            milestoneMessages.push(`${users[i].name} has reached ${users[i].points.toLocaleString()} points!`);
-                        }
-                        users[i].hours = users[i].points / 12;
-                        pointGainers.push(users[i].name);
-                    }
-                }
-                users[i].hourlyStats[parseInt(new Date().getHours())] = {
-                    messages: users[i].messages,
-                    points: users[i].points
-                }
-                users[i].dailyStats[`${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`] = {
-                    messages: users[i].messages,
-                    points: users[i].points
-                }
-            }
-            db.overwriteOne(process.argv[2], 'users', users);
-            if (pointGainers.length > 0) {
-                sendMSG(`${new Date().toString().split('GMT')[0]}: ${pointGainers.length} users have gained 1 point (${pointGainers})`);
-                for (let i = 0; i < milestoneMessages.length; i++) {
-                    sendMSG(milestoneMessages[i]);
-                }
-                let Child = fork('backup.js', [process.argv[2]]);
-                Child.on('exit', (code) => {
-                    console.log(`Child exited with code ${code}`);
-                });
-            }
-            console.log(`${new Date()}: ${pointGainers.length} users have gained 1 point (${pointGainers})`)
-        }
-    }
-    if ('i' == 'i') {
-        let timers = await db.getOne(process.argv[2], 'timers');
-        for (let i = 0; i < timers.length; i++) {
-            let interval = timers[i].interval * 1000;
-            let currentTime = new Date().getTime();
-            let lastCalled = timers[i].lastCalled;
-            let difference = currentTime - lastCalled;
-            if (difference >= interval) {
-                timers[i].lastCalled = currentTime;
-                db.editWithinArray(process.argv[2], 'timers', 'name', timers[i].name, 'lastCalled', currentTime)
-                sendMSG(timers[i].text);
-            }
-        }
-    }
-}, 1000)
-
-setInterval(async () => {
-    if (queue.length > 0) {
-        if (queue[0].length > 200) {
-            let messages = [];
-            let message = queue[0];
-            while (message.length > 200) {
-                messages.push(message.substring(0, 200));
-                message = message.substring(200);
-            }
-            messages.push(message);
-            messages = messages.reverse();
-            for (let i = 0; i < messages.length; i++) {
-                console.log("SENDING MESSAGE: " + messages[i]);
-                mc.sendMessage(messages[i]).catch((error) => {
-                    console.error(error);
-                })
-            }
-            queue.shift();
-        } else {
-            queue[0] = queue[0].toString()
-            console.log("SENDING MESSAGE: " + queue[0]);
-            mc.sendMessage(queue[0]).catch((error) => {
-                console.error(error);
-            });
-            queue.shift();
-        }
-    }
-}, 100)
-
 async function handleCommand(chat, command) {
-    //console.log("handleCommand", chat.rawMessage);
+    let { users } = JSON.parse(JSON.stringify(batch));
     let cooldown = false;
     let thing = false;
-    let users = await db.getOne(process.argv[2], 'users');
     if (chat.authorChannelId) {
         for (let i = 0; i < users.length; i++) {
             if (users[i].id == chat.authorChannelId) {
@@ -516,6 +447,11 @@ async function handleCommand(chat, command) {
                     users[i].cooldown = [];
                 }
                 db.editWithinArray(process.argv[2], 'users', 'id', users[i].id, 'cooldown', users[i].cooldown);
+                for (let i = 0; i < batch.users.length; i++) {
+                    if (batch.users[i].id == users[i].id) {
+                        batch.users[i].cooldown = users[i].cooldown;
+                    }
+                }
                 break;
             }
         }
@@ -534,6 +470,11 @@ async function handleCommand(chat, command) {
                 response = response.replace(`{${i}}`, message[i]);
             }
             await db.overwriteObjectInArray(process.argv[2], 'commands', 'id', command.id, command);
+            for (let i = 0; i < batch.commands.length; i++) {
+                if (batch.commands[i].id == command.id) {
+                    batch.commands[i].used = command.used;
+                }
+            }
             let msg = await variableCheck(response, chat, command);
             //console.log("Sending:", msg)
             sendMSG(msg);
@@ -546,6 +487,11 @@ async function handleCommand(chat, command) {
                 command.used = 1;
             }
             await db.overwriteObjectInArray(process.argv[2], 'commands', 'id', command.id, command);
+            for (let i = 0; i < batch.commands.length; i++) {
+                if (batch.commands[i].id == command.id) {
+                    batch.commands[i].used = command.used;
+                }
+            }
             let msg = await variableCheck(response, chat, command);
             //console.log("Sending:", msg)
             sendMSG(msg);
@@ -555,7 +501,42 @@ async function handleCommand(chat, command) {
     return ""
 }
 
-async function handleGiveaway(chat, command, cmdIndex) {
+async function handleCounting(chat) {
+    console.log("handleCounting", chat.rawMessage);
+    let counting = await db.getOne(process.argv[2], 'counting');
+    counting.messages.push(chat);
+    if (counting.messages.length + 1 > 50) {
+        counting.messages.shift();
+    }
+    counting.number++;
+    counting.lastMSG = chat.timestampUsec;
+    db.overwriteOne(process.argv[2], 'counting', counting);
+    if (counting.users) {
+        let found = false;
+        for (let i = 0; i < counting.users.length; i++) {
+            if (counting.users[i].id == chat.authorChannelId) {
+                counting.users[i].count++;
+                counting.users[i].name = chat.authorName;
+                counting.users[i].image = chat.authorPhoto;
+                found = true;
+                db.editWithinArray(process.argv[2], 'counting', 'id', chat.authorChannelId, 'count', counting.users[i].count);
+                db.editWithinArray(process.argv[2], 'counting', 'id', chat.authorChannelId, 'name', chat.authorName);
+                db.editWithinArray(process.argv[2], 'counting', 'id', chat.authorChannelId, 'image', chat.authorPhoto);
+                break;
+            }
+        }
+        if (found == false) {
+            db.pushToArray(process.argv[2], 'counting', 'users', {
+                id: chat.authorChannelId,
+                name: chat.authorName,
+                image: chat.authorPhoto,
+                count: 1
+            });
+        }
+    }
+}
+
+async function handleGiveaway(chat) {
     let giveaway = await db.getOne(process.argv[2], 'giveaway');
     let users = await db.getOne(process.argv[2], 'users');
     let author = users.find(x => x.id == chat.authorChannelId);
@@ -609,10 +590,8 @@ async function handleGiveaway(chat, command, cmdIndex) {
 
 let lastused = 0;
 async function variableCheck(response, msg, cmd) {
-    let connection = await db.getOne(process.argv[2], 'connection');
-    let users = await db.getOne(process.argv[2], 'users');
-    let commands = await db.getOne(process.argv[2], 'commands');
-    let votes = await db.getOne(process.argv[2], 'votes');
+    let a = new Date();
+    let { users, commands, connection, votes } = JSON.parse(JSON.stringify(batch));
     response = response.replace(/{query}/g, stringify(msg.message).split(' ').slice(1).join(' '));
     response = response.replace(/{ownerName}/g, connection.channel.snippet.title);
     response = response.replace(/{ownerId}/g, connection.channel.id);
@@ -683,6 +662,15 @@ async function variableCheck(response, msg, cmd) {
                     cooldown: 0,
                     permission: 'everyone'
                 });
+                batch.commands.push({
+                    id: randomStr8,
+                    command: command,
+                    response: response2,
+                    default: false,
+                    used: 0,
+                    cooldown: 0,
+                    permission: 'everyone'
+                });
                 return `added ${command}`;
             } else {
                 return `${command} already exists`;
@@ -703,6 +691,7 @@ async function variableCheck(response, msg, cmd) {
             }
             if (found) {
                 db.removeObject(process.argv[2], 'commands', 'id', command.id);
+                batch.commands = batch.commands.filter((cmd) => cmd.id != command.id);
                 return `removed ${command}`;
             } else {
                 return `${command} does not exist`;
@@ -727,6 +716,11 @@ async function variableCheck(response, msg, cmd) {
             }
             if (found) {
                 db.overwriteObjectInArray(process.argv[2], 'commands', 'id', u.id, u);
+                for (let i = 0; i < batch.commands.length; i++) {
+                    if (batch.commands[i].id == u.id) {
+                        batch.commands[i] = u;
+                    }
+                }
                 return `edited ${command}`;
             } else {
                 return `${command} does not exist`;
@@ -739,9 +733,16 @@ async function variableCheck(response, msg, cmd) {
     response = await response.replace(/\{addQuote\s*([^{}]+)\}/g, (match, expr) => {
         try {
             let quote = expr
+            let id = Math.random().toString(36).substring(7);
             db.addObject(process.argv[2], 'quotes', {
                 quote: quote,
-                id: Math.random().toString(36).substring(7),
+                id: id,
+                time: Date.now(),
+                quotedBy: msg.authorChannelId
+            });
+            batch.quotes.push({
+                quote: quote,
+                id: id,
                 time: Date.now(),
                 quotedBy: msg.authorChannelId
             });
@@ -784,9 +785,18 @@ async function variableCheck(response, msg, cmd) {
                 }
                 if (found) {
                     db.overwriteObjectInArray(process.argv[2], 'votes', 'name', vote.toLowerCase(), u);
+                    for (let i = 0; i < batch.votes.length; i++) {
+                        if (batch.votes[i].name == vote.toLowerCase()) {
+                            batch.votes[i] = u;
+                        }
+                    }
                     return `${vote}`;
                 } else if (vote) {
                     db.addObject(process.argv[2], 'votes', {
+                        name: vote.toLowerCase(),
+                        votes: 1
+                    });
+                    batch.votes.push({
                         name: vote.toLowerCase(),
                         votes: 1
                     });
@@ -834,9 +844,9 @@ async function variableCheck(response, msg, cmd) {
             messages: author.messages,
             hours: author.points / 12
         }
-        if (Object.keys(author.dailyStats).length > 7) {
+        if (Object.keys(author.dailyStats).length > 8) {
             let keys = Object.keys(author.dailyStats);
-            let pointsGain = (parseFloat(author.points) - parseFloat(author.weeklyStats[keys[keys.length - 8]].points));
+            let pointsGain = (parseFloat(author.points) - parseFloat(author.dailyStats[keys[keys.length - 8]].points));
             let msgGain = (parseFloat(author.messages) - parseFloat(author.dailyStats[keys[keys.length - 8]].messages));
             let hoursGain = pointsGain / 12;
             gain = {
@@ -857,8 +867,8 @@ async function variableCheck(response, msg, cmd) {
         }
         if (Object.keys(author.dailyStats).length > 30) {
             let keys = Object.keys(author.dailyStats);
-            let pointsGain = (parseFloat(author.points) - parseFloat(author.dailyStats[keys[keys.length - 31]].points));
-            let msgGain = (parseFloat(author.messages) - parseFloat(author.dailyStats[keys[keys.length - 31]].messages));
+            let pointsGain = (parseFloat(author.points) - parseFloat(author.dailyStats[keys[keys.length - 30]].points));
+            let msgGain = (parseFloat(author.messages) - parseFloat(author.dailyStats[keys[keys.length - 30]].messages));
             let hoursGain = pointsGain / 12;
             gain = {
                 points: pointsGain.toLocaleString(),
@@ -922,6 +932,8 @@ async function variableCheck(response, msg, cmd) {
             return stuff()
         }
     }
+    let b = new Date();
+    console.log("variableCheck took ", (b - a) / 1000, "seconds", msg.rawMessage.toString());
     return response;
 }
 
@@ -947,8 +959,95 @@ mc.on("end", () => {
     process.exit();
 });
 
-async function random(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+
+let lastMinute = new Date().getMinutes();
+setInterval(async () => {
+    let minutes = new Date().getMinutes();
+    if (minutes % 5 == 0 && lastMinute != minutes) {
+        lastMinute = minutes;
+        let pointGainers = [];
+        let milestoneMessages = [];
+        let users = await db.getOne(process.argv[2], 'users');
+        let settings = await db.getOne(process.argv[2], 'settings');
+        if (settings.currency.enabled == true) {
+            for (let i = 0; i < users.length; i++) {
+                if (users[i].active == true) {
+                    if ((users[i].id != "UCL6_4AyDYTpn_lfF227ur9w")) {
+                        users[i].points = (parseFloat(users[i].points) + 1)
+                        users[i].active = false;
+                        if (checkmilestone(parseInt(users[i].points))) {
+                            milestoneMessages.push(`${users[i].name} has reached ${users[i].points.toLocaleString()} points!`);
+                        }
+                        users[i].hours = users[i].points / 12;
+                        pointGainers.push(users[i].name);
+                        users[i].dailyStats[`${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`] = {
+                            messages: users[i].messages,
+                            points: users[i].points
+                        }
+                    }
+                }
+                users[i].hourlyStats[parseInt(new Date().getHours())] = {
+                    messages: users[i].messages,
+                    points: users[i].points
+                }
+            }
+            db.overwriteOne(process.argv[2], 'users', users);
+            if (pointGainers.length > 0) {
+                sendMSG(`${new Date().toString().split('GMT')[0]}: ${pointGainers.length} users have gained 1 point (${pointGainers})`);
+                for (let i = 0; i < milestoneMessages.length; i++) {
+                    sendMSG(milestoneMessages[i]);
+                }
+                let Child = fork('backup.js', [process.argv[2]]);
+                Child.on('exit', (code) => {
+                    console.log(`Child exited with code ${code}`);
+                });
+            }
+            console.log(`${new Date()}: ${pointGainers.length} users have gained 1 point (${pointGainers})`)
+        }
+    }
+    if ('i' == 'i') {
+        let timers = await db.getOne(process.argv[2], 'timers');
+        for (let i = 0; i < timers.length; i++) {
+            let interval = timers[i].interval * 1000;
+            let currentTime = new Date().getTime();
+            let lastCalled = timers[i].lastCalled;
+            let difference = currentTime - lastCalled;
+            if (difference >= interval) {
+                timers[i].lastCalled = currentTime;
+                db.editWithinArray(process.argv[2], 'timers', 'name', timers[i].name, 'lastCalled', currentTime)
+                sendMSG(timers[i].text);
+            }
+        }
+    }
+}, 1000)
+
+setInterval(async () => {
+    if (queue.length > 0) {
+        if (queue[0].length > 200) {
+            let messages = [];
+            let message = queue[0];
+            while (message.length > 200) {
+                messages.push(message.substring(0, 200));
+                message = message.substring(200);
+            }
+            messages.push(message);
+            messages = messages.reverse();
+            for (let i = 0; i < messages.length; i++) {
+                console.log("SENDING MESSAGE: " + messages[i]);
+              //  mc.sendMessage(messages[i]).catch((error) => {
+             //       console.error(error);
+            //    })
+            }
+            queue.shift();
+        } else {
+            queue[0] = queue[0].toString()
+            console.log("SENDING MESSAGE: " + queue[0]);
+        //    mc.sendMessage(queue[0]).catch((error) => {
+       //         console.error(error);
+        //    });
+            queue.shift();
+        }
+    }
+}, 100)
 
 mc.listen();

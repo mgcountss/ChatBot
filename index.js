@@ -1628,6 +1628,111 @@ app.get('/currency/enable', async (req, res) => {
     }
 });
 
+app.get('/public/currency/:id', async (req, res) => {
+    let dir = './users/' + req.params.id + "/db/users.json";
+    if (fs.existsSync(dir)) {
+        let currency = JSON.parse(fs.readFileSync(dir));
+        if (req.query.uid) {
+            let user = currency.find(x => x.id == req.query.uid);
+            if (user) {
+                res.status(200).send({
+                    success: true,
+                    user: user
+                });
+            } else {
+                res.status(400).send({
+                    error: 'User not found',
+                    success: false
+                });
+            }
+        } else if (req.query.all) {
+            if (req.query.sort) {
+                currency = currency.sort((a, b) => {
+                    return parseFloat(b[req.query.sort]) - parseFloat(a[req.query.sort]);
+                });
+            } else {
+                currency = currency.sort((a, b) => {
+                    return parseFloat(b.points) - parseFloat(a.points);
+                });
+            }
+            for (let i = 0; i < currency.length; i++) {
+                let dailyKeys = Object.keys(currency[i].dailyStats);
+                try {
+                currency[i].daily = {
+                    points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 2]].points),
+                    messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 2]].messages)
+                }
+            } catch (err) {
+                currency[i].daily = {
+                    points: parseFloat(currency[i].points),
+                    messages: parseFloat(currency[i].messages)
+                }
+            }
+            try {
+                currency[i].weekly = {
+                    points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 8]].points),
+                    messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 8]].messages)
+                }
+            } catch (err) {
+                currency[i].weekly = {
+                    points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[0]].points),
+                    messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[0]].messages)
+                }
+            }
+            try {
+                currency[i].monthly = {
+                    points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 31]].points),
+                    messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 31]].messages)
+                }
+            } catch (err) {
+                currency[i].monthly = {
+                    points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[0]].points),
+                    messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[0]].messages)
+                }
+            }
+                delete currency[i].dailyStats;
+                delete currency[i].hourlyStats;
+                delete currency[i].hourly;
+                delete currency[i].warns;
+                delete currency[i].allWarns;
+            }
+            res.status(200).send({
+                success: true,
+                users: currency
+            });
+        } else {
+            let limit = req.query.limit;
+            let offset = req.query.offset;
+            if (limit && offset) {
+                if (req.query.sort) {
+                    currency = currency.sort((a, b) => {
+                        return parseFloat(b[req.query.sort]) - parseFloat(a[req.query.sort]);
+                    });
+                } else {
+                    currency = currency.sort((a, b) => {
+                        return parseFloat(b.points) - parseFloat(a.points);
+                    });
+                }
+                let users = currency.slice(offset, limit);
+                res.status(200).send({
+                    success: true,
+                    users: users
+                });
+            } else {
+                res.status(400).send({
+                    error: 'Missing limit or offset',
+                    success: false
+                });
+            }
+        }
+    } else {
+        res.status(400).send({
+            error: 'Invalid ID or File not found',
+            success: false
+        });
+    }
+});
+
 setInterval(checkLiveChannels, 1000 * 60 * 5);
 checkLiveChannels();
 
