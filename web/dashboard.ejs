@@ -179,6 +179,7 @@
                         <option value="name">Username</option>
                         <option value="points">Points</option>
                         <option value="hours">Hours</option>
+                        <option value="xp">XP</option>
                         <option value="messages">Messages</option>
                         <option value="lastmsg">Last Message</option>
                         <option value="moderator">Moderator</option>
@@ -197,6 +198,7 @@
                         <th>Username</th>
                         <th>Points</th>
                         <th>Hours</th>
+                        <th>XP</th>
                         <th>Messages</th>
                         <th>LastMSG</th>
                         <th>Member</th>
@@ -433,6 +435,13 @@
                         <td>100</td>
                     </tr>
                     <tr>
+                        <td>{authorXP}</td>
+                        <td>Gets the xp of the user who sent the message</td>
+                        <td>{authorXP}</td>
+                        <td>!xp</td>
+                        <td>100</td>
+                    </tr>
+                    <tr>
                         <td>{authorMessages}</td>
                         <td>Gets the messages of the user who sent the message</td>
                         <td>{authorMessages}</td>
@@ -441,24 +450,24 @@
                     </tr>
                     <tr>
                         <td>{authorDaily}</td>
-                        <td>Gets the amount of points gained in the past 24 hours</td>
+                        <td>Gets the amount of points/messages/hours/xp gained in the past 24 hours</td>
                         <td>{authorDaily}</td>
                         <td>!daily</td>
-                        <td>100</td>
+                        <td>Points: 100, Messages: 100, Hours: 100, XP: 100</td>
                     </tr>
                     <tr>
                         <td>{authorWeekly}</td>
-                        <td>Gets the amount of points gained in the past 7 days</td>
+                        <td>Gets the amount of points/messages/hours/xp gained the the past 7 days</td>
                         <td>{authorWeekly}</td>
                         <td>!weekly</td>
-                        <td>100</td>
+                        <td>Points: 100, Messages: 100, Hours: 100, XP: 100</td>
                     </tr>
                     <tr>
                         <td>{authorMonthly}</td>
-                        <td>Gets the amount of points gained in the past 30 days</td>
+                        <td>Gets the amount of points/messages/hours/xp gained the the past 30 days</td>
                         <td>{authorMonthly}</td>
                         <td>!monthly</td>
-                        <td>100</td>
+                        <td>Points: 100, Messages: 100, Hours: 100, XP: 100</td>
                     </tr>
                     <tr>
                         <td>{addCommand}</td>
@@ -582,6 +591,8 @@
                                     Points</option>
                             <option value="hours" <% if (user.giveaway.requirementType=="hours" ) { %>selected<% } %>>
                                     Hours</option>
+                            <option value="xp" <% if (user.giveaway.requirementType=="xp" ) { %>selected<% } %>>
+                                    XP</option>
                         </select>
                         <hr><br>
                         <label>Requirement Amount</label><br><input id="requirementAmount" type="number"
@@ -930,6 +941,7 @@
             }
             return output;
         }
+       
         let pointHolder = [-15, 0]
         let voteHolder = [0, 30]
         let logHolder = [0, 30]
@@ -1010,11 +1022,12 @@
                         if (myJson[i].membership) {
                             memberthing = myJson[i].membership.since ? myJson[i].membership.since : "Unknown"
                         } 
-                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}')">
+                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}')">
                         <td><img src="${myJson[i].photo}" style="width: 50px; height: 50px;"></td>
                         <td>${myJson[i].name}</td>
                         <td>${myJson[i].points}</td>
                         <td>${myJson[i].hours}</td>
+                        <td>${myJson[i].xp}</td>
                         <td>${myJson[i].messages}</td>
                         <td>${relativeTime(parseFloat(myJson[i].lastMSG))}</td>
                         <td>${memberthing}</td>
@@ -1044,6 +1057,7 @@
                         <th>Username</th>
                         <th>Points</th>
                         <th>Hours</th>
+                        <th>XP</th>
                         <th>Messages</th>
                         <th>Last MSG</th>
                         <th>Member</th>
@@ -1060,11 +1074,12 @@
                         if (myJson[i].membership) {
                             memberthing = myJson[i].membership.since ? myJson[i].membership.since : "Unknown"
                         }
-                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}')">
+                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}')">
                         <td><img src="${myJson[i].photo}" style="width: 50px; height: 50px;"></td>
                         <td>${myJson[i].name}</td>
                         <td>${myJson[i].points}</td>
                         <td>${myJson[i].hours}</td>
+                        <td>${myJson[i].xp}</td>
                         <td>${myJson[i].messages}</td>
                         <td>${relativeTime(parseFloat(myJson[i].lastMSG))}</td>
                         <td>${memberthing}</td>
@@ -1095,11 +1110,12 @@
                         if (myJson[i].membership) {
                             memberthing = myJson[i].membership.since ? myJson[i].membership.since : "Unknown"
                         }
-                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}', '${myJson[i].warns}', '${myJson[i].allWarns}')">
+                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}', '${myJson[i].warns}', '${myJson[i].allWarns}')">
                         <td><img src="${myJson[i].photo}" style="width: 50px; height: 50px;"></td>
                         <td>${myJson[i].name}</td>
                         <td>${myJson[i].points}</td>
                         <td>${myJson[i].hours}</td>
+                        <td>${myJson[i].xp}</td>
                         <td>${myJson[i].messages}</td>
                         <td>${relativeTime(parseFloat(myJson[i].lastMSG))}</td>
                         <td>${memberthing}</td>
@@ -1122,6 +1138,7 @@
                         <th>Username</th>
                         <th>Points</th>
                         <th>Hours</th>
+                        <th>XP</th>
                         <th>Messages</th>
                         <th>LastMSG</th>
                         <th>Member</th>
@@ -1211,7 +1228,7 @@
         let openID = "";
         let pop = document.createElement("div");
         pop.classList.add("popup");
-        function popup(type, id, name, channelID, photo, timestamp, message, a, b, c, d, e, f, g, h, i, j, k, l, m, n) {
+        function popup(type, id, name, channelID, photo, timestamp, message, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) {
             if (open) {
                 exitPopup()
             } else {
@@ -1233,17 +1250,18 @@
                                     <input type="text" id="photo" value="${channelID}"><button onclick="updateUser('photo', '${id}')">Update</button><br>
                                     <p>Name: <input type="text" id="name" value="${name}"><button onclick="updateUser('name', '${id}')">Update</button></p>
                                     <p>User ID: <input type="text" id="id" value="${id}"></p>
-                                    <p>Last MSG: <input type="text" id="lastMsg" value="${a}"></p>
+                                    <p>Last MSG: <input type="text" id="lastMsg" value="${b}"></p>
                                     <p>Points: <input type="text" id="points2" value="${photo}"><button onclick="updateUser('points', '${id}')">Update</button></p>
-                                    <p>Messages: <input type="text" id="messages" value="${message}"><button onclick="updateUser('messages', '${id}')">Update</button></p>
+                                    <p>Messages: <input type="text" id="messages" value="${a}"><button onclick="updateUser('messages', '${id}')">Update</button></p>
                                     <p>Hours: <input type="text" id="hours" value="${timestamp}"><button onclick="updateUser('hours', '${id}')">Update</button></p>
-                                    <p>Member: <input type="text" id="member" value="${b}"></p>
-                                    <p>Moderator: <input type="text" id="moderator" value="${c}"></p>
-                                    <p>Verified: <input type="text" id="verified" value="${d}"></p>
-                                    <p>Owner: <input type="text" id="owner" value="${e}"></p>
-                                    <p>Custom Rank: <input type="text" id="customRank" value="${f}"><button onclick="updateUser('customRank', '${id}')">Update</button></p>
-                                    <p>Current Warnings: <input type="text" id="warnings" value="${g}"></p>
-                                    <p>All Warnings: <input type="text" id="allWarnings" value="${h}"></p>
+                                    <p>XP: <input type="text" id="xp" value="${message}"><button onclick="updateUser('hours', '${id}')">Update</button></p>
+                                    <p>Member: <input type="text" id="member" value="${c}"></p>
+                                    <p>Moderator: <input type="text" id="moderator" value="${d}"></p>
+                                    <p>Verified: <input type="text" id="verified" value="${e}"></p>
+                                    <p>Owner: <input type="text" id="owner" value="${f}"></p>
+                                    <p>Custom Rank: <input type="text" id="customRank" value="${g}"><button onclick="updateUser('customRank', '${id}')">Update</button></p>
+                                    <p>Current Warnings: <input type="text" id="warnings" value="${h}"></p>
+                                    <p>All Warnings: <input type="text" id="allWarnings" value="${i}"></p>
                                     <button onclick="updateUser('warnings', '${id}')">Clear Warnings</button>
                                     <br>
                                     <div style="display:flex; width: 100%; justify-content: space-between;">

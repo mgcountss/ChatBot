@@ -260,7 +260,7 @@ app.get('/points/:min/:max', async (req, res) => {
                 } else if (sort == "lastmsg") {
                     sort = "lastMSG"
                 }
-                if (sort == "points" || sort == "messages" || sort == "hours" || sort == "lastMSG") {
+                if (sort == "points" || sort == "messages" || sort == "hours" || sort == "lastMSG" || sort == "xp") {
                     if (sort == "lastMSG") {
                         things.sort((a, b) => {
                             return parseFloat(b["lastMSG"]) - parseFloat(a["lastMSG"])
@@ -282,6 +282,9 @@ app.get('/points/:min/:max', async (req, res) => {
                             let keys = Object.keys(things[i].dailyStats);
                             gain = (parseFloat(things[i][req.query.sortType]) - parseFloat(things[i].dailyStats[keys[keys.length - (parseFloat(req.query.sortTime) + 1)]][req.query.sortType]));
                             things[i].gain = gain;
+                            if ((new Date() * 1000) - parseFloat(things[i].lastMSG) > (parseFloat(req.query.sortTime) * 86400000000)) {
+                                things[i].gain = 0;
+                            }
                         } else {
                             things[i].gain = gain;
                         }
@@ -418,7 +421,7 @@ app.post('/checkforstream', async (req, res) => {
                             });
                             livechats.splice(index, 1);
                             children.splice(index, 1);
-                            Child = fork('chatbot.js', [userID, stream.id]);
+                            checkLiveChannels();
                         });
                     }
                     res.send({ "success": "true" })
@@ -450,7 +453,7 @@ app.post('/checkforstream', async (req, res) => {
 app.get('/logs/:min/:max', async (req, res) => {
     if (req.cookies['chatbot']) {
         let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let logs = await db.getOne(userID, 'logs')
+        let logs = await db.getOne(userID, 'messages')
         if (userID) {
             let things = [...logs];
             things = things.reverse();
@@ -474,10 +477,12 @@ app.get('/totals', async (req, res) => {
             let messages = stream.messages;
             let points = 0;
             let hours = 0;
+            let xp = 0;
             let voteCount = 0;
             for (let i = 0; i < users.length; i++) {
                 points += parseFloat(users[i].points);
                 hours += parseFloat(users[i].hours);
+                xp += parseFloat(users[i].xp);
             }
             for (let i = 0; i < votes.length; i++) {
                 voteCount += parseFloat(votes[i].votes);
@@ -486,9 +491,9 @@ app.get('/totals', async (req, res) => {
                 messages: messages,
                 points: points,
                 hours: hours,
+                xp: xp,
                 users: users.length,
-                votes: voteCount,
-                likes: stream.likes
+                votes: voteCount
             })
         } else {
             res.send('Error')
@@ -903,19 +908,27 @@ app.post('/editCommand', async (req, res) => {
 
 app.get('/chat', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let messages = [...await db.getOne(userID, 'messages')]
-        if (userID) {
-            messages = messages.sort((a, b) => {
-                return parseFloat(a.timestampUsec) - parseFloat(b.timestampUsec);
-            });
-            res.status(200).send({
-                messages: messages.slice(-25),
-                success: true
-            });
-        } else {
-            res.status(401).send({
-                error: 'Unauthorized',
+        try {
+            let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+            let messages = [...await db.getOne(userID, 'messages')]
+            if (userID) {
+                messages = messages.sort((a, b) => {
+                    return parseFloat(a.timestampUsec) - parseFloat(b.timestampUsec);
+                });
+                res.status(200).send({
+                    messages: messages.slice(-25),
+                    success: true
+                });
+            } else {
+                res.status(401).send({
+                    error: 'Unauthorized',
+                    success: false
+                });
+            }
+        } catch (e) {
+            console.log(e)
+            res.status(404).send({
+                error: 'Not found',
                 success: false
             });
         }
@@ -1252,12 +1265,13 @@ async function checkLiveChannels() {
                                     Child.send('Hello from the parent!');
                                     Child.on('exit', (code, signal) => {
                                         console.log(`Child process exited with code ${code} and signal ${signal}`);
+                                        let stream = db.getOne(userId, 'stream')
                                         let index = livechats.findIndex((stream2) => {
                                             return stream2 == stream.id;
                                         });
                                         livechats.splice(index, 1);
                                         children.splice(index, 1);
-                                        Child = fork('chatbot.js', [userId, stream.id]);
+                                        checkLiveChannels();
                                     });
                                     Child.on('error', (err) => {
                                         console.log(err);
@@ -1629,105 +1643,419 @@ app.get('/currency/enable', async (req, res) => {
 });
 
 app.get('/public/currency/:id', async (req, res) => {
-    let dir = './users/' + req.params.id + "/db/users.json";
-    if (fs.existsSync(dir)) {
-        let currency = JSON.parse(fs.readFileSync(dir));
-        if (req.query.uid) {
-            let user = currency.find(x => x.id == req.query.uid);
-            if (user) {
-                res.status(200).send({
-                    success: true,
-                    user: user
-                });
+    res.render(__dirname + '/web/public.ejs');
+});
+
+app.get('/public/currency/:uid/user', async (req, res) => {
+    try {
+        let dir = './users/' + req.params.uid + "/db/users.json";
+        if (fs.existsSync(dir)) {
+            let currency = JSON.parse(fs.readFileSync(dir));
+            if (req.query.id) {
+                let user = currency.find(x => x.id == req.query.id);
+                let dailyKeys = Object.keys(user.dailyStats);
+                try {
+                    user.daily = {
+                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].points),
+                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].messages),
+                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].xp)
+                    }
+                } catch (err) {
+                    user.daily = {
+                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
+                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
+                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
+                    }
+                }
+                try {
+                    user.weekly = {
+                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].points),
+                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].messages),
+                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].xp)
+                    }
+                } catch (err) {
+                    user.weekly = {
+                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
+                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
+                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
+                    }
+                }
+                try {
+                    user.monthly = {
+                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].points),
+                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].messages),
+                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].xp)
+                    }
+                } catch (err) {
+                    user.monthly = {
+                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
+                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
+                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
+                    }
+                }
+                if (user.lastMSG) {
+                    if ((Date.now() * 1000) - (user.lastMSG) > 86400000000) {
+                        user.daily = {
+                            points: 0,
+                            messages: 0,
+                            xp: 0
+                        }
+                    }
+                    if ((Date.now() * 1000) - (user.lastMSG) > 604800000000000) {
+                        user.weekly = {
+                            points: 0,
+                            messages: 0,
+                            xp: 0
+                        }
+                    }
+                    if ((Date.now() * 1000) - (user.lastMSG) > 2592000000000) {
+                        user.monthly = {
+                            points: 0,
+                            messages: 0,
+                            xp: 0
+                        }
+                    }
+                }
+                if (user) {
+                    res.render(__dirname + '/web/user.ejs', {
+                        user: user
+                    });
+                } else {
+                    res.status(400).send({
+                        error: 'User not found',
+                        success: false
+                    });
+                }
             } else {
                 res.status(400).send({
-                    error: 'User not found',
+                    error: 'Missing id',
                     success: false
                 });
             }
-        } else if (req.query.all) {
-            if (req.query.sort) {
-                currency = currency.sort((a, b) => {
-                    return parseFloat(b[req.query.sort]) - parseFloat(a[req.query.sort]);
-                });
-            } else {
-                currency = currency.sort((a, b) => {
-                    return parseFloat(b.points) - parseFloat(a.points);
-                });
-            }
-            for (let i = 0; i < currency.length; i++) {
-                let dailyKeys = Object.keys(currency[i].dailyStats);
-                try {
-                currency[i].daily = {
-                    points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 2]].points),
-                    messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 2]].messages)
-                }
-            } catch (err) {
-                currency[i].daily = {
-                    points: parseFloat(currency[i].points),
-                    messages: parseFloat(currency[i].messages)
-                }
-            }
-            try {
-                currency[i].weekly = {
-                    points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 8]].points),
-                    messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 8]].messages)
-                }
-            } catch (err) {
-                currency[i].weekly = {
-                    points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[0]].points),
-                    messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[0]].messages)
-                }
-            }
-            try {
-                currency[i].monthly = {
-                    points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 31]].points),
-                    messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 31]].messages)
-                }
-            } catch (err) {
-                currency[i].monthly = {
-                    points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[0]].points),
-                    messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[0]].messages)
-                }
-            }
-                delete currency[i].dailyStats;
-                delete currency[i].hourlyStats;
-                delete currency[i].hourly;
-                delete currency[i].warns;
-                delete currency[i].allWarns;
-            }
-            res.status(200).send({
-                success: true,
-                users: currency
-            });
         } else {
-            let limit = req.query.limit;
-            let offset = req.query.offset;
-            if (limit && offset) {
-                if (req.query.sort) {
-                    currency = currency.sort((a, b) => {
-                        return parseFloat(b[req.query.sort]) - parseFloat(a[req.query.sort]);
+            res.status(400).send({
+                error: 'Channel not found',
+                success: false
+            });
+        }
+    } catch (err) {
+        console.log(err);
+        res.status(400).send({
+            error: 'Something went wrong',
+            success: false
+        });
+    }
+});
+
+app.post('/public/currency/:id', async (req, res) => {
+    try {
+        let dir = './users/' + req.params.id + "/db/users.json";
+        if (fs.existsSync(dir)) {
+            let currency = JSON.parse(fs.readFileSync(dir));
+            if (req.query.uid) {
+                let user = currency.find(x => x.id == req.query.uid);
+                if (user) {
+                    delete user.dailyStats;
+                    delete user.hourlyStats;
+                    delete user.warns;
+                    delete user.allWarns;
+                    delete user.cooldown;
+                    res.status(200).send({
+                        success: true,
+                        user: user
                     });
                 } else {
-                    currency = currency.sort((a, b) => {
-                        return parseFloat(b.points) - parseFloat(a.points);
+                    res.status(400).send({
+                        error: 'User not found',
+                        success: false
                     });
                 }
-                let users = currency.slice(offset, limit);
+            } else if (req.query.search) {
+                let users = currency.filter((user) => {
+                    return (user.name.toLowerCase().includes(req.query.search.toLowerCase())) || (user.id.toLowerCase().includes(req.query.search.toLowerCase()));
+                });
+                for (let i = 0; i < users.length; i++) {
+                    let dailyKeys = Object.keys(users[i].dailyStats);
+                    try {
+                        users[i].daily = {
+                            points: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 2]].points),
+                            messages: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 2]].messages),
+                            xp: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 2]].xp)
+                        }
+                    } catch (err) {
+                        try {
+                            users[i].daily = {
+                                points: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(users[i].dailyStats[dailyKeys[0]].points),
+                                messages: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(users[i].dailyStats[dailyKeys[0]].messages),
+                                xp: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(users[i].dailyStats[dailyKeys[0]].xp)
+                            }
+                        } catch (err) {
+                            users[i].daily = {
+                                points: users[i].points,
+                                messages: users[i].messages,
+                                xp: users[i].xp
+                            }
+                        }
+                    }
+                    try {
+                        users[i].weekly = {
+                            points: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 8]].points),
+                            messages: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 8]].messages),
+                            xp: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 8]].xp)
+                        }
+                    } catch (err) {
+                        try {
+                            users[i].weekly = {
+                                points: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(users[i].dailyStats[dailyKeys[0]].points),
+                                messages: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(users[i].dailyStats[dailyKeys[0]].messages),
+                                xp: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(users[i].dailyStats[dailyKeys[0]].xp)
+                            }
+                        } catch (err) {
+                            users[i].weekly = {
+                                points: users[i].points,
+                                messages: users[i].messages,
+                                xp: users[i].xp
+                            }
+                        }
+                    }
+                    try {
+                        users[i].monthly = {
+                            points: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 31]].points),
+                            messages: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 31]].messages),
+                            xp: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 31]].xp)
+                        }
+                    } catch (err) {
+                        try {
+                            users[i].monthly = {
+                                points: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(users[i].dailyStats[dailyKeys[0]].points),
+                                messages: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(users[i].dailyStats[dailyKeys[0]].messages),
+                                xp: parseFloat(users[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(users[i].dailyStats[dailyKeys[0]].xp)
+                            }
+                        } catch (err) {
+                            users[i].monthly = {
+                                points: users[i].points,
+                                messages: users[i].messages,
+                                xp: users[i].xp
+                            }
+                        }
+                    }
+                    if (users[i].lastMSG) {
+                        if ((Date.now() * 1000) - (users[i].lastMSG) > 86400000000) {
+                            users[i].daily = {
+                                points: 0,
+                                messages: 0,
+                                xp: 0
+                            }
+                        }
+                        if ((Date.now() * 1000) - (users[i].lastMSG) > 604800000000) {
+                            users[i].weekly = {
+                                points: 0,
+                                messages: 0,
+                                xp: 0
+                            }
+                        }
+                        if ((Date.now() * 1000) - (users[i].lastMSG) > 2592000000000) {
+                            users[i].monthly = {
+                                points: 0,
+                                messages: 0,
+                                xp: 0
+                            }
+                        }
+                    }
+                    delete users[i].dailyStats;
+                    delete users[i].hourlyStats;
+                    delete users[i].warns;
+                    delete users[i].allWarns;
+                    delete users[i].cooldown;
+                }
+                let limit = req.query.limit;
+                let offset = req.query.offset;
+                if (limit && offset) {
+                    if (req.query.sort) {
+                        if ((req.query.sort == 'dailyPoints') || (req.query.sort == 'dailyMessages') || (req.query.sort == 'dailyXP') || (req.query.sort == 'weeklyPoints') ||(req.query.sort == 'weeklyMessages') || (req.query.sort == 'weeklyXP') || (req.query.sort == 'monthlyPoints') || (req.query.sort == 'monthlyMessages') || (req.query.sort == 'monthlyXP')) {
+                            if (req.query.sort.includes('Points')) {
+                                req.query.sort = req.query.sort.replace('Points', '');
+                                users = users.sort((a, b) => {
+                                    return parseFloat(b[req.query.sort].points) - parseFloat(a[req.query.sort].points);
+                                });
+                            } else if (req.query.sort.includes('Messages')) {
+                                req.query.sort = req.query.sort.replace('Messages', '');
+                                users = users.sort((a, b) => {
+                                    return parseFloat(b[req.query.sort].messages) - parseFloat(a[req.query.sort].messages);
+                                });
+                            } else if (req.query.sort.includes('XP')) {
+                                req.query.sort = req.query.sort.replace('XP', '');
+                                users = users.sort((a, b) => {
+                                    return parseFloat(b[req.query.sort].xp) - parseFloat(a[req.query.sort].xp);
+                                });
+                            }
+                        } else {
+                            users = users.sort((a, b) => {
+                                return parseFloat(b[req.query.sort]) - parseFloat(a[req.query.sort]);
+                            });
+                        }
+                        if (req.query.order == 'asc') {
+                            users = users.reverse();
+                        }
+                    }
+                    users = users.slice(offset, offset + limit);
+                }
                 res.status(200).send({
                     success: true,
                     users: users
                 });
             } else {
-                res.status(400).send({
-                    error: 'Missing limit or offset',
-                    success: false
-                });
+                for (let i = 0; i < currency.length; i++) {
+                    let dailyKeys = Object.keys(currency[i].dailyStats);
+                    try {
+                        currency[i].daily = {
+                            points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 2]].points),
+                            messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 2]].messages),
+                            xp: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 2]].xp)
+                        }
+                    } catch (err) {
+                        try {
+                            currency[i].daily = {
+                                points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[0]].points),
+                                messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[0]].messages),
+                                xp: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(currency[i].dailyStats[dailyKeys[0]].xp)
+                            }
+                        } catch (err) {
+                            currency[i].daily = {
+                                points: currency[i].points,
+                                messages: currency[i].messages,
+                                xp: currency[i].xp
+                            }
+                        }
+                    }
+                    try {
+                        currency[i].weekly = {
+                            points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 8]].points),
+                            messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 8]].messages),
+                            xp: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 8]].xp)
+                        }
+                    } catch (err) {
+                        try {
+                            currency[i].weekly = {
+                                points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[0]].points),
+                                messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[0]].messages),
+                                xp: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(currency[i].dailyStats[dailyKeys[0]].xp)
+                            }
+                        } catch (err) {
+                            currency[i].weekly = {
+                                points: currency[i].points,
+                                messages: currency[i].messages,
+                                xp: currency[i].xp
+                            }
+                        }
+                    }
+                    try {
+                        currency[i].monthly = {
+                            points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 31]].points),
+                            messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 31]].messages),
+                            xp: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 31]].xp)
+                        }
+                    } catch (err) {
+                        try {
+                            currency[i].monthly = {
+                                points: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(currency[i].dailyStats[dailyKeys[0]].points),
+                                messages: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(currency[i].dailyStats[dailyKeys[0]].messages),
+                                xp: parseFloat(currency[i].dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(currency[i].dailyStats[dailyKeys[0]].xp)
+                            }
+                        } catch (err) {
+                            currency[i].monthly = {
+                                points: currency[i].points,
+                                messages: currency[i].messages,
+                                xp: currency[i].xp
+                            }
+                        }
+                    }
+                    if (currency[i].lastMSG) {
+                        if ((Date.now() * 1000) - (currency[i].lastMSG) > 86400000000) {
+                            currency[i].daily = {
+                                points: 0,
+                                messages: 0,
+                                xp: 0
+                            }
+                        }
+                        if ((Date.now() * 1000) - (currency[i].lastMSG) > 604800000000) {
+                            currency[i].weekly = {
+                                points: 0,
+                                messages: 0,
+                                xp: 0
+                            }
+                        }
+                        if ((Date.now() * 1000) - (currency[i].lastMSG) > 2592000000000) {
+                            currency[i].monthly = {
+                                points: 0,
+                                messages: 0,
+                                xp: 0
+                            }
+                        }
+                    }
+                    delete currency[i].dailyStats;
+                    delete currency[i].hourlyStats;
+                    delete currency[i].hourly;
+                    delete currency[i].warns;
+                    delete currency[i].allWarns;
+                    delete currency[i].cooldown;
+                }
+                let limit = req.query.limit;
+                let offset = req.query.offset;
+                if (limit && offset) {
+                    if (req.query.sort) {
+                        if ((req.query.sort == 'dailyPoints') || (req.query.sort == 'dailyMessages') || (req.query.sort == 'dailyXP') || (req.query.sort == 'weeklyPoints') || (req.query.sort == 'weeklyMessages') || (req.query.sort == 'weeklyXP') ||  (req.query.sort == 'monthlyPoints') || (req.query.sort == 'monthlyMessages') || (req.query.sort == 'monthlyXP')) {
+                            if (req.query.sort.includes('Points')) {
+                                req.query.sort = req.query.sort.replace('Points', '');
+                                currency = currency.sort((a, b) => {
+                                    return parseFloat(b[req.query.sort].points) - parseFloat(a[req.query.sort].points);
+                                });
+                            } else if (req.query.sort.includes('Messages')) {
+                                req.query.sort = req.query.sort.replace('Messages', '');
+                                currency = currency.sort((a, b) => {
+                                    return parseFloat(b[req.query.sort].messages) - parseFloat(a[req.query.sort].messages);
+                                });
+                            } else if (req.query.sort.includes('XP')) {
+                                req.query.sort = req.query.sort.replace('XP', '');
+                                currency = currency.sort((a, b) => {
+                                    return parseFloat(b[req.query.sort].xp) - parseFloat(a[req.query.sort].xp);
+                                });
+                            }
+                        } else {
+                            currency = currency.sort((a, b) => {
+                                return parseFloat(b[req.query.sort]) - parseFloat(a[req.query.sort]);
+                            });
+                        }
+                    } else {
+                        currency = currency.sort((a, b) => {
+                            return parseFloat(b.points) - parseFloat(a.points);
+                        });
+                    }
+                    if (req.query.order == 'asc') {
+                        currency = currency.reverse();
+                    }
+                    let users = currency.slice(parseFloat(offset), parseFloat(offset) + parseFloat(limit));
+                    res.status(200).send({
+                        success: true,
+                        users: users,
+                        total: currency.length
+                    });
+                } else {
+                    res.status(400).send({
+                        error: 'Missing some data',
+                        success: false
+                    });
+                }
             }
+        } else {
+            res.status(400).send({
+                error: 'Invalid ID or File not found',
+                success: false
+            });
         }
-    } else {
+    } catch (err) {
         res.status(400).send({
-            error: 'Invalid ID or File not found',
+            error: 'Something went wrong',
             success: false
         });
     }
@@ -1735,6 +2063,11 @@ app.get('/public/currency/:id', async (req, res) => {
 
 setInterval(checkLiveChannels, 1000 * 60 * 5);
 checkLiveChannels();
+
+setInterval(() => {
+    console.log(livechats, livechats.length);
+    console.log(children.length);
+}, 10000)
 
 app.listen(8080, () => {
     console.log('Server started on port 8080');
