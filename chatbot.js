@@ -1109,9 +1109,9 @@ setInterval(async () => {
 }, 100)
 
 function realSendMSG() {
-    //mc.sendMessage(queue[0]).catch((error) => {
-    //     console.error(error);
-    //  });
+    mc.sendMessage(queue[0]).catch((error) => {
+         console.error(error);
+      });
 }
 
 mc.listen();
