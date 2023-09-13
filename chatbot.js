@@ -8,12 +8,28 @@ console.log('Starting chatbot...')
 
 let credentials = JSON.parse(fs.readFileSync('./users/' + process.argv[2] + '/credentials.json'));
 const mc = await Masterchat.init(process.argv[3], { credentials });
-//mc.sendMessage("alive").catch((error) => {
-//   console.error(error);
-//});
+mc.sendMessage("alive").catch((error) => {
+    console.error(error);
+});
 
 let webhook1;
 let webhook2;
+
+let batch = {
+    "ids": [],
+    "messages": [],
+    "users": [],
+    "moderation": {},
+    "stream": {},
+    "giveaway": {},
+    "settings": {},
+    "counting": {},
+    "commands": [],
+    "votes": [],
+    "connection": {},
+    "commands": [],
+    "active": false
+}
 
 try {
     webhook1 = fs.readFileSync('./users/' + process.argv[2] + '/webhook1.txt', 'utf8');
@@ -45,21 +61,6 @@ process.on('message', (message) => {
     }
 });
 
-let batch = {
-    "ids": [],
-    "messages": [],
-    "users": [],
-    "moderation": {},
-    "stream": {},
-    "giveaway": {},
-    "settings": {},
-    "counting": {},
-    "commands": [],
-    "votes": [],
-    "connection": {},
-    "commands": []
-}
-
 let preventDouble = [];
 let first = true;
 let lastCalledMinutes = new Date().getMinutes() - 1;
@@ -89,6 +90,7 @@ mc.on("actions", async (chats) => {
         batch.votes = await db.getOne(process.argv[2], 'votes');
         batch.connection = await db.getOne(process.argv[2], 'connection');
         batch.commands = await db.getOne(process.argv[2], 'commands');
+        batch.active = true;
         for (const chat of chats) {
             if (new Date().getMinutes() !== lastCalledMinutes) {
                 if (new Date().getMinutes() % 5 == 0) {
@@ -133,6 +135,21 @@ mc.on("actions", async (chats) => {
         await db.overwriteOne(process.argv[2], 'votes', batch.votes);
         await db.overwriteOne(process.argv[2], 'connection', batch.connection);
         await db.overwriteOne(process.argv[2], 'commands', batch.commands);
+        batch = {
+            "ids": [],
+            "messages": [],
+            "users": [],
+            "moderation": {},
+            "stream": {},
+            "giveaway": {},
+            "settings": {},
+            "counting": {},
+            "commands": [],
+            "votes": [],
+            "connection": {},
+            "commands": [],
+            "active": false
+        }
     }
     first = false;
 });
@@ -340,6 +357,7 @@ async function logMessage(chat, start) {
                         dailyStats: {}
                     };
                     batch.users.push(obj);
+                    sendMSG(`Welcome @${obj.name} to the stream!`);
                 }
                 chat.message = (stringify(chat.message)).replace(/</g, "â®").replace(/>/g, "â¯")
                 chat.authorName = (stringify(chat.authorName)).replace(/</g, "â®").replace(/>/g, "â¯")
@@ -389,7 +407,7 @@ async function logMessage(chat, start) {
                         let cmd = false;
                         for (let i = 0; i < commands.length; i++) {
                             let add = 1;
-                            if (chat.message.includes('!vote ')) {
+                            if ((chat.message.includes('!vote ')) || (chat.message.includes('!wall'))) {
                                 add = 5;
                             }
                             if ((stringify(chat.message).split(' ')[0].toLowerCase()) == ((commands[i].command.toLowerCase()))) {
@@ -432,6 +450,12 @@ async function logMessage(chat, start) {
                                     } else {
                                         console.log("User not found");
                                     }
+                                    if (checkmilestone(counting.number + 1)) {
+                                        sendMSG(`${chat.authorName} has counted to ${counting.number + 1}!`);
+                                        if (userIndex !== -1) {
+                                            batch.users[userIndex].xp += 15;
+                                        }
+                                    }
                                     return await handleCounting(chat);
                                 }
                             }
@@ -455,6 +479,15 @@ async function logMessage(chat, start) {
                                     "default": true,
                                     "id": "8tuf4g"
                                 });
+                            }
+                            const userIndex = batch.users.findIndex(x => x.id === chat.authorChannelId);
+                            if (((stringify(chat.message).includes('aj')) || (stringify(chat.message).includes('mg'))) && ((stringify(chat.message).includes('best')) || (stringify(chat.message).includes('great')) || (stringify(chat.message).includes('good')))) {
+                                if (userIndex !== -1) {
+                                    if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
+                                        batch.users[userIndex].xp = 0;
+                                    }
+                                    batch.users[userIndex].xp += 10;
+                                }
                             }
                         }
                     }

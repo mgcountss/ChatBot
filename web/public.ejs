@@ -116,7 +116,7 @@
                         <td id="points_${q}" cid="${data[q].id}">${Math.floor(parseFloat(data[q].points)).toLocaleString()}</td>
                         <td id="messages_${q}" cid="${data[q].id}">${parseFloat(data[q].messages).toLocaleString()}</td>
                         <td id="hours_${q}" cid="${data[q].id}">${parseFloat(data[q].hours).toFixed(2).toLocaleString()}</td>
-                        <td id="xp_${q}" cid="${data[q].id}">${parseFloat(data[q].xp).toFixed(2).toLocaleString()}</td>
+                        <td id="xp_${q}" cid="${data[q].id}">${parseFloat(data[q].xp).toLocaleString()}</td>
                         <td id="dailyPoints_${q}" cid="${data[q].id}">${data[q].daily.points.toLocaleString()}</td>
                         <td id="dailyMessages_${q}" cid="${data[q].id}">${data[q].daily.messages.toLocaleString()}</td>
                         <td id="dailyXP_${q}" cid="${data[q].id}">${data[q].daily.xp ? data[q].daily.xp.toLocaleString() : 0}</td>
@@ -144,6 +144,8 @@
             order = 'desc'
         }
         sort = by
+        pastData = []
+        offset = 0
         $('.counters').html('')
         load()
     }
