@@ -246,7 +246,7 @@ app.get('/points/:min/:max', async (req, res) => {
         }
     }
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = "UCSgk1g0AZi9_759yfz-iIHg"
         let users = await db.getOne(userID, 'users')
         if (users) {
             let things = [...users];
@@ -297,8 +297,8 @@ app.get('/points/:min/:max', async (req, res) => {
                         delete things[i].cooldown
                         delete things[i].dailyStats
                         delete things[i].hourlyStats
-                        things[i].allWarns = things[i].allWarns ? things[i].allWarns.length : 0
-                        things[i].warns = things[i].warns ? things[i].warns.length : 0
+                        things[i].warns = things[i].warnings ? things[i].warnings : []
+                        things[i].warnings = things[i].warnings ? things[i].warnings.length : 0
                     }
                 }
                 res.send(things)
@@ -316,13 +316,20 @@ app.get('/points/:min/:max', async (req, res) => {
 app.post('/search/:min/:max', async (req, res) => {
     if (req.body.search == undefined) return res.send('Error' + req.body.search)
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = "UCSgk1g0AZi9_759yfz-iIHg"
         let users = await db.getOne(userID, 'users')
         if (users) {
             let things = [...users];
             let query = req.body.search.toLowerCase();
             let results = things.filter(x => x.name.toLowerCase().includes(query) || x.id.toLowerCase().includes(query));
             results = results.slice(parseInt(req.params.min), parseInt(req.params.max));
+            for (let i = 0; i < results.length; i++) {
+                delete results[i].cooldown
+                delete results[i].dailyStats
+                delete results[i].hourlyStats
+                results[i].warns = results[i].warnings ? results[i].warnings : []
+                results[i].warnings = results[i].warnings ? results[i].warnings.length : 0
+            }
             res.send(results)
         } else {
             res.send('Error')
@@ -376,7 +383,7 @@ app.get('/votes/:min/:max', async (req, res) => {
         sort = req.query.sort
     }
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = "UCSgk1g0AZi9_759yfz-iIHg"
         let votes = await db.getOne(userID, 'votes')
         if (userID) {
             let things = [...votes];
@@ -452,7 +459,7 @@ app.post('/checkforstream', async (req, res) => {
 
 app.get('/logs/:min/:max', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = "UCSgk1g0AZi9_759yfz-iIHg"
         let logs = await db.getOne(userID, 'messages')
         if (userID) {
             let things = [...logs];
@@ -529,7 +536,8 @@ app.get('/odometer.css', async (req, res) => {
 
 app.get('/dashboard', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userAuth = await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = "UCSgk1g0AZi9_759yfz-iIHg"
         let commands = await db.getOne(userID, 'commands')
         let connection = await db.getOne(userID, 'connection')
         let counting = await db.getOne(userID, 'counting')
@@ -561,11 +569,11 @@ app.get('/dashboard', async (req, res) => {
             users: users,
             votes: votes
         }
-        if (userID) {
-            res.render(__dirname + '/web/dashboard.ejs', { user: user, stringify: stringify, relativeTime: relativeTime });
-        } else {
-            res.redirect('/connect');
+        let auth = false;
+        if (userAuth) {
+            auth = true;
         }
+        res.render(__dirname + '/web/dashboard.ejs', { user: user, stringify: stringify, relativeTime: relativeTime, auth: auth });
     } else {
         res.redirect('/connect');
     }
@@ -909,7 +917,7 @@ app.post('/editCommand', async (req, res) => {
 app.get('/chat', async (req, res) => {
     if (req.cookies['chatbot']) {
         try {
-            let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+            let userID = "UCSgk1g0AZi9_759yfz-iIHg"
             let messages = [...await db.getOne(userID, 'messages')]
             if (userID) {
                 messages = messages.sort((a, b) => {
@@ -1642,6 +1650,23 @@ app.get('/currency/enable', async (req, res) => {
     }
 });
 
+app.get('/public/live/chat/:id', async (req, res) => {
+    let dir = './users/' + req.params.id + "/db/messages.json";
+    if (fs.existsSync(dir)) {
+        let messages = JSON.parse(fs.readFileSync(dir));
+        messages = messages.sort((a, b) => {
+            return b.timestampUsec - a.timestampUsec;
+        });
+        messages = messages.slice(0, 15);
+        res.send(messages);
+    } else {
+        res.status(404).send({
+            error: 'Not found',
+            success: false
+        });
+    }
+});
+
 app.get('/public/currency/:id', async (req, res) => {
     res.render(__dirname + '/web/public.ejs');
 });
@@ -1872,7 +1897,7 @@ app.post('/public/currency/:id', async (req, res) => {
                 let offset = req.query.offset;
                 if (limit && offset) {
                     if (req.query.sort) {
-                        if ((req.query.sort == 'dailyPoints') || (req.query.sort == 'dailyMessages') || (req.query.sort == 'dailyXP') || (req.query.sort == 'weeklyPoints') ||(req.query.sort == 'weeklyMessages') || (req.query.sort == 'weeklyXP') || (req.query.sort == 'monthlyPoints') || (req.query.sort == 'monthlyMessages') || (req.query.sort == 'monthlyXP')) {
+                        if ((req.query.sort == 'dailyPoints') || (req.query.sort == 'dailyMessages') || (req.query.sort == 'dailyXP') || (req.query.sort == 'weeklyPoints') || (req.query.sort == 'weeklyMessages') || (req.query.sort == 'weeklyXP') || (req.query.sort == 'monthlyPoints') || (req.query.sort == 'monthlyMessages') || (req.query.sort == 'monthlyXP')) {
                             if (req.query.sort.includes('Points')) {
                                 req.query.sort = req.query.sort.replace('Points', '');
                                 users = users.sort((a, b) => {
@@ -2004,7 +2029,7 @@ app.post('/public/currency/:id', async (req, res) => {
                 let offset = req.query.offset;
                 if (limit && offset) {
                     if (req.query.sort) {
-                        if ((req.query.sort == 'dailyPoints') || (req.query.sort == 'dailyMessages') || (req.query.sort == 'dailyXP') || (req.query.sort == 'weeklyPoints') || (req.query.sort == 'weeklyMessages') || (req.query.sort == 'weeklyXP') ||  (req.query.sort == 'monthlyPoints') || (req.query.sort == 'monthlyMessages') || (req.query.sort == 'monthlyXP')) {
+                        if ((req.query.sort == 'dailyPoints') || (req.query.sort == 'dailyMessages') || (req.query.sort == 'dailyXP') || (req.query.sort == 'weeklyPoints') || (req.query.sort == 'weeklyMessages') || (req.query.sort == 'weeklyXP') || (req.query.sort == 'monthlyPoints') || (req.query.sort == 'monthlyMessages') || (req.query.sort == 'monthlyXP')) {
                             if (req.query.sort.includes('Points')) {
                                 req.query.sort = req.query.sort.replace('Points', '');
                                 currency = currency.sort((a, b) => {
@@ -2061,8 +2086,16 @@ app.post('/public/currency/:id', async (req, res) => {
     }
 });
 
-setInterval(checkLiveChannels, 1000 * 60 * 5);
 checkLiveChannels();
+
+setInterval(() => {
+    for (let i = 0; i < children.length; i++) {
+        children[i].kill();
+    }
+    children = [];
+    livechats = [];
+    checkLiveChannels();
+}, 1000 * 60 * 60);
 
 setInterval(() => {
     console.log(livechats, livechats.length);

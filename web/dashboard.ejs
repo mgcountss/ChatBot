@@ -206,7 +206,7 @@
                         <th>Verified</th>
                         <th>Owner</th>
                         <th>Custom Rank</th>
-                        <th>Current Warns/Warns</th>
+                        <th>Warns</th>
                     </tr>
                 </table>
                 <button onclick="loadMorePoints()" id="loadMore">Load More</button>
@@ -1022,7 +1022,7 @@
                         if (myJson[i].membership) {
                             memberthing = myJson[i].membership.since ? myJson[i].membership.since : "Unknown"
                         } 
-                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}')">
+                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}', '${myJson[i].warnings}', '${myJson[i].warns}')">
                         <td><img src="${myJson[i].photo}" style="width: 50px; height: 50px;"></td>
                         <td>${myJson[i].name}</td>
                         <td>${myJson[i].points}</td>
@@ -1035,6 +1035,7 @@
                         <td>${myJson[i].isVerified}</td>
                         <td>${myJson[i].isOwner}</td>
                         <td>${myJson[i].customRank}</td>
+                        <td>${myJson[i].warnings}</td>
                     </tr>`
                     }
                 });
@@ -1065,6 +1066,7 @@
                         <th>Verified</th>
                         <th>Owner</th>
                         <th>Custom Rank</th>
+                        <th>Warns</th>
                 </tr>`
                     for (var i = 0; i < myJson.length; i++) {
                         if (!myJson[i].customRank) {
@@ -1074,7 +1076,7 @@
                         if (myJson[i].membership) {
                             memberthing = myJson[i].membership.since ? myJson[i].membership.since : "Unknown"
                         }
-                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}')">
+                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}', '${myJson[i].warnings}', '${myJson[i].warns}')">
                         <td><img src="${myJson[i].photo}" style="width: 50px; height: 50px;"></td>
                         <td>${myJson[i].name}</td>
                         <td>${myJson[i].points}</td>
@@ -1087,6 +1089,7 @@
                         <td>${myJson[i].isVerified}</td>
                         <td>${myJson[i].isOwner}</td>
                         <td>${myJson[i].customRank}</td>
+                        <td>${myJson[i].warnings}</td>
                     </tr>`
                     }
                     document.getElementById('loadMore').setAttribute("onclick", "expandSearch()");
@@ -1110,7 +1113,7 @@
                         if (myJson[i].membership) {
                             memberthing = myJson[i].membership.since ? myJson[i].membership.since : "Unknown"
                         }
-                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}', '${myJson[i].warns}', '${myJson[i].allWarns}')">
+                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}', '${myJson[i].warnings}', '${myJson[i].warns}')">
                         <td><img src="${myJson[i].photo}" style="width: 50px; height: 50px;"></td>
                         <td>${myJson[i].name}</td>
                         <td>${myJson[i].points}</td>
@@ -1123,7 +1126,7 @@
                         <td>${myJson[i].isVerified}</td>
                         <td>${myJson[i].isOwner}</td>
                         <td>${myJson[i].customRank}</td>
-                        <td>${myJson[i].warns}/${myJson[i].allWarns}</td>
+                        <td>${myJson[i].warnings}</td>
                     </tr>`
                     }
                 });
@@ -1244,6 +1247,9 @@
                 }
             }
             if (type == 'user') {
+                for (var e = 0; e < i.length; e++) {
+                    i[e] = `<p>${i[e]}</p>`
+                }
                 pop.innerHTML = `
                                 <div class="popup-content">
                                     <img src="${channelID}" style="width: 50px; height: 50px; border-radius: 50%;"><br>
@@ -1260,8 +1266,9 @@
                                     <p>Verified: <input type="text" id="verified" value="${e}"></p>
                                     <p>Owner: <input type="text" id="owner" value="${f}"></p>
                                     <p>Custom Rank: <input type="text" id="customRank" value="${g}"><button onclick="updateUser('customRank', '${id}')">Update</button></p>
-                                    <p>Current Warnings: <input type="text" id="warnings" value="${h}"></p>
-                                    <p>All Warnings: <input type="text" id="allWarnings" value="${i}"></p>
+                                    <p>Warnings: <input type="text" id="warnings" value="${h}"></p>
+                                    <p>All Warnings:</p>
+                                    <p>${i}</p>
                                     <button onclick="updateUser('warnings', '${id}')">Clear Warnings</button>
                                     <br>
                                     <div style="display:flex; width: 100%; justify-content: space-between;">

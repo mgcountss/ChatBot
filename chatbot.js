@@ -8,9 +8,9 @@ console.log('Starting chatbot...')
 
 let credentials = JSON.parse(fs.readFileSync('./users/' + process.argv[2] + '/credentials.json'));
 const mc = await Masterchat.init(process.argv[3], { credentials });
-mc.sendMessage("alive").catch((error) => {
-    console.error(error);
-});
+//mc.sendMessage("alive").catch((error) => {
+//   console.error(error);
+//});
 
 let webhook1;
 let webhook2;
@@ -65,16 +65,6 @@ let preventDouble = [];
 let first = true;
 let lastCalledMinutes = new Date().getMinutes() - 1;
 
-setInterval(() => {
-    if (new Date().getMinutes() !== lastCalledMinutes) {
-        if (new Date().getMinutes() % 5 == 0) {
-            console.log("Updating everything");
-            lastCalledMinutes = new Date().getMinutes();
-            updateEverything();
-        }
-    }
-}, 10000);
-
 mc.on("actions", async (chats) => {
     if (first == false) {
         chats = chats.sort((a, b) => a.timestampUsec - b.timestampUsec);
@@ -91,14 +81,9 @@ mc.on("actions", async (chats) => {
         batch.connection = await db.getOne(process.argv[2], 'connection');
         batch.commands = await db.getOne(process.argv[2], 'commands');
         batch.active = true;
+        let index = 0;
         for (const chat of chats) {
-            if (new Date().getMinutes() !== lastCalledMinutes) {
-                if (new Date().getMinutes() % 5 == 0) {
-                    console.log("Updating everything");
-                    lastCalledMinutes = new Date().getMinutes();
-                    updateEverything();
-                }
-            }
+            index++;
             if (!batch.ids.includes(chat.id)) {
                 if (!preventDouble.includes(chat.id)) {
                     preventDouble.push(chat.id);
@@ -122,33 +107,43 @@ mc.on("actions", async (chats) => {
                     }
                 }
             }
-        }
-        await db.overwriteOne(process.argv[2], 'ids', batch.ids);
-        await db.overwriteOne(process.argv[2], 'messages', batch.messages);
-        await db.overwriteOne(process.argv[2], 'users', batch.users);
-        await db.overwriteOne(process.argv[2], 'moderation', batch.moderation);
-        await db.overwriteOne(process.argv[2], 'stream', batch.stream);
-        await db.overwriteOne(process.argv[2], 'giveaway', batch.giveaway);
-        await db.overwriteOne(process.argv[2], 'settings', batch.settings);
-        await db.overwriteOne(process.argv[2], 'counting', batch.counting);
-        await db.overwriteOne(process.argv[2], 'commands', batch.commands);
-        await db.overwriteOne(process.argv[2], 'votes', batch.votes);
-        await db.overwriteOne(process.argv[2], 'connection', batch.connection);
-        await db.overwriteOne(process.argv[2], 'commands', batch.commands);
-        batch = {
-            "ids": [],
-            "messages": [],
-            "users": [],
-            "moderation": {},
-            "stream": {},
-            "giveaway": {},
-            "settings": {},
-            "counting": {},
-            "commands": [],
-            "votes": [],
-            "connection": {},
-            "commands": [],
-            "active": false
+            console.log(index + "/" + chats.length);
+            if (index == chats.length) {
+                if (new Date().getMinutes() !== lastCalledMinutes) {
+                    if ((new Date().getMinutes() % 5 == 0) || (new Date().getMinutes() % 5 == lastCalledMinutes + 1)) {
+                        console.log("Updating everything");
+                        lastCalledMinutes = new Date().getMinutes();
+                        await db.overwriteOne(process.argv[2], 'ids', batch.ids);
+                        await db.overwriteOne(process.argv[2], 'messages', batch.messages);
+                        await db.overwriteOne(process.argv[2], 'users', batch.users);
+                        await db.overwriteOne(process.argv[2], 'moderation', batch.moderation);
+                        await db.overwriteOne(process.argv[2], 'stream', batch.stream);
+                        await db.overwriteOne(process.argv[2], 'giveaway', batch.giveaway);
+                        await db.overwriteOne(process.argv[2], 'settings', batch.settings);
+                        await db.overwriteOne(process.argv[2], 'counting', batch.counting);
+                        await db.overwriteOne(process.argv[2], 'commands', batch.commands);
+                        await db.overwriteOne(process.argv[2], 'votes', batch.votes);
+                        await db.overwriteOne(process.argv[2], 'connection', batch.connection);
+                        await db.overwriteOne(process.argv[2], 'commands', batch.commands);
+                        batch = {
+                            "ids": [],
+                            "messages": [],
+                            "users": [],
+                            "moderation": {},
+                            "stream": {},
+                            "giveaway": {},
+                            "settings": {},
+                            "counting": {},
+                            "commands": [],
+                            "votes": [],
+                            "connection": {},
+                            "commands": [],
+                            "active": false
+                        }
+                        await updateEverything();
+                    }
+                }
+            }
         }
     }
     first = false;
@@ -354,7 +349,8 @@ async function logMessage(chat, start) {
                         active: true,
                         blacklist: [],
                         hourlyStats: {},
-                        dailyStats: {}
+                        dailyStats: {},
+                        warnings: []
                     };
                     batch.users.push(obj);
                     sendMSG(`Welcome @${obj.name} to the stream!`);
@@ -584,8 +580,7 @@ async function handleCommand(chat, command) {
                     }
                 }
                 console.log("handleCommand took: ", (new Date() - a) / 1000, "seconds", chat.rawMessage);
-                sendMSG(await variableCheck(response, chat, command))
-                return "";
+                return await variableCheck(response, chat, command)
             } else {
                 let response = command.response;
                 if (command.used) {
@@ -599,8 +594,7 @@ async function handleCommand(chat, command) {
                     }
                 }
                 console.log("handleCommand took: ", (new Date() - a) / 1000, "seconds", chat.rawMessage);
-                sendMSG(await variableCheck(response, chat, command))
-                return "";
+                return await variableCheck(response, chat, command)
             }
         }
     }
@@ -987,37 +981,78 @@ async function variableCheck(response, msg, cmd) {
         }
         async function nextThing() {
             let fileName = response.split('{writeFile ')[1].split('}')[0];
-            let fileContent = response.split('}')[1];
-            if (fileName.includes('/')) {
-                fileName = fileName.split('/');
-                fileName = fileName[fileName.length - 1];
-            }
-            if (fileName.includes('\\')) {
-                fileName = fileName.split('\\');
-                fileName = fileName[fileName.length - 1];
-            }
-            async function stuff() {
-                if (fs.existsSync(`./users/${process.argv[2]}`)) {
-                    fs.writeFile(`./users/${process.argv[2]}/files/` + fileName, fileContent, (error) => {
-                        if (error) {
-                            console.error(error);
-                        }
-                    });
-                } else {
-                    fs.mkdirSync(`./users/${process.argv[2]}`);
-                    fs.writeFile(fileName, fileContent, (error) => {
-                        if (error) {
-                            console.error(error);
-                        }
-                    });
+            if (fileName == 'wall.txt') {
+                let fileContent = response.split('}')[1];
+                if (fileName.includes('/')) {
+                    fileName = fileName.split('/');
+                    fileName = fileName[fileName.length - 1];
                 }
-                response = `added ${msg.authorName}`;
-                return response
+                if (fileName.includes('\\')) {
+                    fileName = fileName.split('\\');
+                    fileName = fileName[fileName.length - 1];
+                }
+                async function stuff() {
+                    if (fs.existsSync(`./users/${process.argv[2]}`)) {
+                        fs.writeFile(`./users/${process.argv[2]}/files/` + fileName, fileContent, (error) => {
+                            if (error) {
+                                console.error(error);
+                            }
+                        });
+                    } else {
+                        fs.mkdirSync(`./users/${process.argv[2]}`);
+                        fs.writeFile(fileName, fileContent, (error) => {
+                            if (error) {
+                                console.error(error);
+                            }
+                        });
+                    }
+                    response = `added ${msg.authorName}`;
+                    return response
+                }
+                return stuff()
+            } else {
+                return "You can only write to wall.txt"
             }
-            return stuff()
         }
     }
-    return response;
+    if (response.includes('{warn ')) {
+        let msg = response.split('{warn ')[1].split('}')[0];
+        if (msg.includes('|')) {
+            let user = msg.split('|')[0];
+            let reason = msg.split('|')[1];
+            let found = false;
+            let total = 0;
+            for (let i = 0; i < batch.users.length; i++) {
+                if ((batch.users[i].name.toLowerCase() == user.toLowerCase()) || (batch.users[i].id == user)) {
+                    if (batch.users[i].warnings) {
+                        batch.users[i].warnings.push({
+                            reason: reason,
+                            time: Date.now(),
+                            mod: msg.authorName
+                        });
+                        total = batch.users[i].warnings.length;
+                        found = true;
+                    } else {
+                        batch.users[i].warnings = [{
+                            reason: reason,
+                            time: Date.now(),
+                            mod: msg.authorName
+                        }];
+                        total = 1;
+                        found = true;
+                    }
+                }
+            }
+            if (found) {
+                response = `warned ${user}, ${total}`;
+            } else {
+                response = `could not find ${user}`;
+            }
+        } else {
+            response = "@" + msg.authorName + ", Please provide the name/id and a reason."
+        }
+    }
+    return sendMSG(response)
 }
 
 let queue = [];
@@ -1141,10 +1176,52 @@ setInterval(async () => {
     }
 }, 100)
 
-function realSendMSG() {
+async function realSendMSG() {
     //mc.sendMessage(queue[0]).catch((error) => {
-    //     console.error(error);
-    //  });
+    //    console.error(error);
+    //});
+    if (batch.active) {
+        batch.messages.push({
+            "type": "addChatItemAction",
+            "id": Math.random().toString(36).substring(12),
+            "timestamp": null,
+            "timestampUsec": new Date().getTime() * 1000,
+            "authorName": "MGBot",
+            "authorChannelId": "UCL6_4AyDYTpn_lfF227ur9w",
+            "authorPhoto": "hhttps://yt3.ggpht.com/ytc/APkrFKZ_nZxOw4SKxqOEyano724_1pVxaiWXeGd1fw9caNy8bkouJC6--xQcXWPbIT8V=s800-c-k-c0x00ffffff-no-rj",
+            "message": queue[0],
+            "isVerified": false,
+            "isOwner": true,
+            "isModerator": false,
+            "contextMenuEndpointParams": null,
+            "rawMessage": [
+                {
+                    "text": queue[0]
+                }
+            ]
+        });
+    } else {
+        await db.addObject(process.argv[2], 'messages', {
+            "type": "addChatItemAction",
+            "id": Math.random().toString(36).substring(12),
+            "timestamp": null,
+            "timestampUsec": new Date().getTime() * 1000,
+            "authorName": "MGBot",
+            "authorChannelId": "UCL6_4AyDYTpn_lfF227ur9w",
+            "authorPhoto": "https://yt3.ggpht.com/ytc/APkrFKZ_nZxOw4SKxqOEyano724_1pVxaiWXeGd1fw9caNy8bkouJC6--xQcXWPbIT8V=s800-c-k-c0x00ffffff-no-rj",
+            "message": queue[0],
+            "isVerified": false,
+            "isOwner": true,
+            "isModerator": false,
+            "contextMenuEndpointParams": null,
+            "rawMessage": [
+                {
+                    "text": queue[0]
+                }
+            ]
+        });
+        await db.removeFirstObject(process.argv[2], 'messages');
+    }
 }
 
 mc.listen();
