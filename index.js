@@ -18,7 +18,10 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-//console.log("INDEX: " + process.memoryUsage().heapUsed / 1024 / 1024);
+if (!fs.existsSync('./user')) {
+    fs.mkdirSync('./user');
+    fs.writeFileSync('./user/key.json', JSON.stringify({}));
+}
 
 async function getStream(id, id2) {
     try {
@@ -72,19 +75,16 @@ app.get('/', async (req, res) => {
 
 app.get('/count', async (req, res) => {
     try {
-        if (req.cookies['chatbot']) {
-            let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-            let counting = await db.getOne(userID, 'counting')
-            if (counting) {
-                if (counting.messages.length > 3) {
-                    counting.messages = counting.messages.sort((a, b) => a.timestampUsec - b.timestampUsec)
-                    counting.users = counting.users.sort((a, b) => a.count - b.count)
-                    counting.users = counting.users.slice(-10)
-                }
-                res.send(counting)
-            } else {
-                res.send('Unauthorized')
+        let counting = await db.getOne('counting')
+        if (counting) {
+            if (counting.messages.length > 3) {
+                counting.messages = counting.messages.sort((a, b) => a.timestampUsec - b.timestampUsec)
+                counting.users = counting.users.sort((a, b) => a.count - b.count)
+                counting.users = counting.users.slice(-10)
             }
+            res.send(counting)
+        } else {
+            res.send('Error')
         }
     } catch (error) {
         console.error('Error:', error);
@@ -92,51 +92,11 @@ app.get('/count', async (req, res) => {
     }
 });
 
-app.post('/updatePlaylist', async (req, res) => {
-    if (req.body.playlist && req.body.title && req.body.id) {
-        if (req.cookies['chatbot']) {
-            let userId = await db.findUserIdFromToken(req.cookies['chatbot']);
-            if (userId) {
-                let playlist = {
-                    currentID: req.body.id,
-                    currentTitle: req.body.title,
-                    url: req.body.playlist
-                }
-                db.overwriteOne(userId, 'playlist', playlist)
-                res.send({ success: true })
-            } else {
-                res.send('Unauthorized')
-            }
-        }
-    } else if (req.body.playlist) {
-        if (req.cookies['chatbot']) {
-            let userId = await db.findUserIdFromToken(req.cookies['chatbot']);
-            let currentPlaylist = await db.getOne(userId, 'playlist')
-            if (userId) {
-                let playlist = {
-                    currentID: currentPlaylist.currentID,
-                    currentTitle: currentPlaylist.currentTitle,
-                    url: req.body.playlist
-                }
-                db.overwriteOne(userId, 'playlist', playlist)
-                res.send({ success: true })
-            } else {
-                res.send('Unauthorized')
-            }
-        }
-    } else {
-        res.send({
-            success: false
-        })
-    }
-})
-
 app.post('/editGiveaway', async (req, res) => {
     if (req.body.prize && req.body.entryRank && req.body.requirementAmount && req.body.requirementType && req.body.command) {
         if (req.cookies['chatbot']) {
-            let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-            let currentGiveaway = await db.getOne(userID, 'giveaway')
-            if (userID) {
+            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await db.getOne('giveaway')
                 let giveaway = {
                     enabled: currentGiveaway.enabled,
                     winner: currentGiveaway.winner,
@@ -147,7 +107,7 @@ app.post('/editGiveaway', async (req, res) => {
                     requirementType: req.body.requirementType,
                     command: req.body.command
                 }
-                db.overwriteOne(userID, 'giveaway', giveaway)
+                db.overwriteOne('giveaway', giveaway)
                 res.send({ success: true })
             } else {
                 res.send('Unauthorized')
@@ -157,13 +117,12 @@ app.post('/editGiveaway', async (req, res) => {
         }
     } else if (req.body.clear) {
         if (req.cookies['chatbot']) {
-            let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-            let currentGiveaway = await db.getOne(userID, 'giveaway')
-            if (userID) {
+            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await db.getOne('giveaway')
                 currentGiveaway.entries = [];
                 currentGiveaway.winner = '';
                 currentGiveaway.enabled = false;
-                db.overwriteOne(userID, 'giveaway', currentGiveaway)
+                db.overwriteOne('giveaway', currentGiveaway)
                 res.send({ success: true })
             } else {
                 res.send('Unauthorized')
@@ -171,13 +130,12 @@ app.post('/editGiveaway', async (req, res) => {
         }
     } else if (req.body.reroll) {
         if (req.cookies['chatbot']) {
-            let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-            let currentGiveaway = await db.getOne(userID, 'giveaway')
-            if (userID) {
+            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await db.getOne('giveaway')
                 currentGiveaway.winner = '';
                 let winner = currentGiveaway.entries[Math.floor(Math.random() * currentGiveaway.entries.length)];
                 currentGiveaway.winner = winner;
-                db.overwriteOne(userID, 'giveaway', currentGiveaway)
+                db.overwriteOne('giveaway', currentGiveaway)
                 res.send({ success: true })
             } else {
                 res.send('Unauthorized')
@@ -185,11 +143,10 @@ app.post('/editGiveaway', async (req, res) => {
         }
     } else if (req.body.start) {
         if (req.cookies['chatbot']) {
-            let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-            let currentGiveaway = await db.getOne(userID, 'giveaway')
-            if (userID) {
+            let currentGiveaway = await db.getOne('giveaway')
+            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
                 currentGiveaway.enabled = true;
-                db.overwriteOne(userID, 'giveaway', currentGiveaway)
+                db.overwriteOne('giveaway', currentGiveaway)
                 res.send({ success: true })
             } else {
                 res.send('Unauthorized')
@@ -197,13 +154,12 @@ app.post('/editGiveaway', async (req, res) => {
         }
     } else if (req.body.stop) {
         if (req.cookies['chatbot']) {
-            let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-            let currentGiveaway = await db.getOne(userID, 'giveaway')
-            if (userID) {
+            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await db.getOne('giveaway')
                 currentGiveaway.enabled = false;
                 let winner = currentGiveaway.entries[Math.floor(Math.random() * currentGiveaway.entries.length)];
                 currentGiveaway.winner = winner;
-                db.overwriteOne(userID, 'giveaway', currentGiveaway)
+                db.overwriteOne('giveaway', currentGiveaway)
                 res.send({ success: true })
             } else {
                 res.send('Unauthorized')
@@ -215,10 +171,9 @@ app.post('/editGiveaway', async (req, res) => {
 });
 
 app.get('/giveaway', async (req, res) => {
-    if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let currentGiveaway = await db.getOne(userID, 'giveaway')
-        if (userID) {
+    let currentGiveaway = await db.getOne('giveaway')
+    if (currentGiveaway) {
+        if (currentGiveaway.entries) {
             for (let i = 0; i < currentGiveaway.entries.length; i++) {
                 currentGiveaway.entries[i] = user.users.find(x => x.id == currentGiveaway.entries[i])
             }
@@ -226,11 +181,9 @@ app.get('/giveaway', async (req, res) => {
                 currentGiveaway.winner = user.users.find(x => x.id == currentGiveaway.winner)
             }
             res.send(currentGiveaway)
-        } else {
-            res.send('Unauthorized')
         }
     } else {
-        res.send('Unauthorized')
+        res.send('Error')
     }
 });
 
@@ -245,97 +198,87 @@ app.get('/points/:min/:max', async (req, res) => {
             }
         }
     }
-    if (req.cookies['chatbot']) {
-        let userID = "UCSgk1g0AZi9_759yfz-iIHg"
-        let users = await db.getOne(userID, 'users')
-        if (users) {
-            let things = [...users];
-            if (things) {
-                if (sort == "verified") {
-                    sort = "isVerified"
-                } else if (sort == "moderator") {
-                    sort = "isModerator"
-                } else if (sort == "owner") {
-                    sort = "isOwner"
-                } else if (sort == "lastmsg") {
-                    sort = "lastMSG"
-                }
-                if (sort == "points" || sort == "messages" || sort == "hours" || sort == "lastMSG" || sort == "xp") {
-                    if (sort == "lastMSG") {
-                        things.sort((a, b) => {
-                            return parseFloat(b["lastMSG"]) - parseFloat(a["lastMSG"])
-                        });
-                    } else {
-                        things.sort((a, b) => {
-                            return parseFloat(b[sort]) - parseFloat(a[sort])
-                        });
-                    }
-                } else if (sort == "isVerified" || sort == "isModerator" || sort == "isOwner") {
-                    things.sort((a, b) => {
-                        return b[sort] - a[sort]
-                    })
-                }
-                if (sort == "gain") {
-                    for (let i = 0; i < things.length; i++) {
-                        let gain = things[i][req.query.sortType];
-                        if (Object.keys(things[i].dailyStats).length > parseFloat(req.query.sortTime)) {
-                            let keys = Object.keys(things[i].dailyStats);
-                            gain = (parseFloat(things[i][req.query.sortType]) - parseFloat(things[i].dailyStats[keys[keys.length - (parseFloat(req.query.sortTime) + 1)]][req.query.sortType]));
-                            things[i].gain = gain;
-                            if ((new Date() * 1000) - parseFloat(things[i].lastMSG) > (parseFloat(req.query.sortTime) * 86400000000)) {
-                                things[i].gain = 0;
-                            }
-                        } else {
-                            things[i].gain = gain;
-                        }
-                    }
-                    things.sort((a, b) => parseFloat(b['gain']) - parseFloat(a['gain']));
-                }
-                things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
-                if (!req.query.lol) {
-                    for (let i = 0; i < things.length; i++) {
-                        delete things[i].cooldown
-                        delete things[i].dailyStats
-                        delete things[i].hourlyStats
-                        things[i].warns = things[i].warnings ? things[i].warnings : []
-                        things[i].warnings = things[i].warnings ? things[i].warnings.length : 0
-                    }
-                }
-                res.send(things)
-            } else {
-                res.send('Error')
+    let users = await db.getOne('users')
+    if (users) {
+        let things = [...users];
+        if (things) {
+            if (sort == "verified") {
+                sort = "isVerified"
+            } else if (sort == "moderator") {
+                sort = "isModerator"
+            } else if (sort == "owner") {
+                sort = "isOwner"
+            } else if (sort == "lastmsg") {
+                sort = "lastMSG"
             }
+            if (sort == "points" || sort == "messages" || sort == "hours" || sort == "lastMSG" || sort == "xp") {
+                if (sort == "lastMSG") {
+                    things.sort((a, b) => {
+                        return parseFloat(b["lastMSG"]) - parseFloat(a["lastMSG"])
+                    });
+                } else {
+                    things.sort((a, b) => {
+                        return parseFloat(b[sort]) - parseFloat(a[sort])
+                    });
+                }
+            } else if (sort == "isVerified" || sort == "isModerator" || sort == "isOwner") {
+                things.sort((a, b) => {
+                    return b[sort] - a[sort]
+                })
+            }
+            if (sort == "gain") {
+                for (let i = 0; i < things.length; i++) {
+                    let gain = things[i][req.query.sortType];
+                    if (Object.keys(things[i].dailyStats).length > parseFloat(req.query.sortTime)) {
+                        let keys = Object.keys(things[i].dailyStats);
+                        gain = (parseFloat(things[i][req.query.sortType]) - parseFloat(things[i].dailyStats[keys[keys.length - (parseFloat(req.query.sortTime) + 1)]][req.query.sortType]));
+                        things[i].gain = gain;
+                        if ((new Date() * 1000) - parseFloat(things[i].lastMSG) > (parseFloat(req.query.sortTime) * 86400000000)) {
+                            things[i].gain = 0;
+                        }
+                    } else {
+                        things[i].gain = gain;
+                    }
+                }
+                things.sort((a, b) => parseFloat(b['gain']) - parseFloat(a['gain']));
+            }
+            things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
+            if (!req.query.lol) {
+                for (let i = 0; i < things.length; i++) {
+                    delete things[i].cooldown
+                    delete things[i].dailyStats
+                    delete things[i].hourlyStats
+                    things[i].warns = things[i].warnings ? things[i].warnings : []
+                    things[i].warnings = things[i].warnings ? things[i].warnings.length : 0
+                }
+            }
+            res.send(things)
         } else {
             res.send('Error')
         }
     } else {
-        res.send('Unauthorized')
+        res.send('Error')
     }
 });
 
 app.post('/search/:min/:max', async (req, res) => {
     if (req.body.search == undefined) return res.send('Error' + req.body.search)
-    if (req.cookies['chatbot']) {
-        let userID = "UCSgk1g0AZi9_759yfz-iIHg"
-        let users = await db.getOne(userID, 'users')
-        if (users) {
-            let things = [...users];
-            let query = req.body.search.toLowerCase();
-            let results = things.filter(x => x.name.toLowerCase().includes(query) || x.id.toLowerCase().includes(query));
-            results = results.slice(parseInt(req.params.min), parseInt(req.params.max));
-            for (let i = 0; i < results.length; i++) {
-                delete results[i].cooldown
-                delete results[i].dailyStats
-                delete results[i].hourlyStats
-                results[i].warns = results[i].warnings ? results[i].warnings : []
-                results[i].warnings = results[i].warnings ? results[i].warnings.length : 0
-            }
-            res.send(results)
-        } else {
-            res.send('Error')
+    let users = await db.getOne('users')
+    if (users) {
+        let things = [...users];
+        let query = req.body.search.toLowerCase();
+        let results = things.filter(x => x.name.toLowerCase().includes(query) || x.id.toLowerCase().includes(query));
+        results = results.slice(parseInt(req.params.min), parseInt(req.params.max));
+        for (let i = 0; i < results.length; i++) {
+            delete results[i].cooldown
+            delete results[i].dailyStats
+            delete results[i].hourlyStats
+            results[i].warns = results[i].warnings ? results[i].warnings : []
+            results[i].warnings = results[i].warnings ? results[i].warnings.length : 0
         }
+        res.send(results)
     } else {
-        res.send('Unauthorized')
+        res.send('Error')
     }
 });
 
@@ -344,7 +287,7 @@ app.post('/removeUser', async (req, res) => {
     if (req.cookies['chatbot']) {
         let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
         if (userID) {
-            db.deleteFromArray(userID, 'users', 'id', req.body.id)
+            db.deleteFromArray('users', 'id', req.body.id)
             res.send({ success: true })
         } else {
             res.send('Error')
@@ -359,21 +302,16 @@ app.get('/messages/:min/:max', async (req, res) => {
     if (req.query.sort) {
         sort = req.query.sort
     }
-    if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let users = await db.getOne(userID, 'users')
-        if (users) {
-            let things = [...users];
-            things.sort((a, b) => {
-                return parseFloat(b[sort]) - parseFloat(a[sort])
-            });
-            things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
-            res.send(things)
-        } else {
-            res.send('Error')
-        }
+    let users = await db.getOne('users')
+    if (users) {
+        let things = [...users];
+        things.sort((a, b) => {
+            return parseFloat(b[sort]) - parseFloat(a[sort])
+        });
+        things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
+        res.send(things)
     } else {
-        res.send('Unauthorized')
+        res.send('Error')
     }
 });
 
@@ -382,72 +320,23 @@ app.get('/votes/:min/:max', async (req, res) => {
     if (req.query.sort) {
         sort = req.query.sort
     }
-    if (req.cookies['chatbot']) {
-        let userID = "UCSgk1g0AZi9_759yfz-iIHg"
-        let votes = await db.getOne(userID, 'votes')
-        if (userID) {
-            let things = [...votes];
-            things.sort((a, b) => {
-                return parseFloat(b[sort]) - parseFloat(a[sort])
-            });
-            things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
-            res.send(things)
-        } else {
-            res.send('Error')
-        }
+    let votes = await db.getOne('votes')
+    if (userID) {
+        let things = [...votes];
+        things.sort((a, b) => {
+            return parseFloat(b[sort]) - parseFloat(a[sort])
+        });
+        things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
+        res.send(things)
     } else {
-        res.send('Unauthorized')
+        res.send('Error')
     }
 });
 
 app.post('/checkforstream', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let stream = await db.getOne(userID, 'stream')
-        if (userID) {
-            getStream(userID, stream.id).then((stream2) => {
-                if (stream2.stream) {
-                    if (!livechats.includes(stream2.stream.id)) {
-                        livechats.push(stream2.stream.id);
-                        db.overwriteOne(userID, 'stream', {
-                            id: stream2.stream.id,
-                            title: stream2.stream.title,
-                            thumbnail: 'https://i.ytimg.com/vi/' + stream2.stream.id + '/hqdefault.jpg',
-                            live: true,
-                            messages: stream.messages,
-                            viewers: stream2.stream.viewers,
-                            likes: stream2.stream.likes
-                        });
-                        Child = fork('chatbot.js', [userID, stream2.stream.id]);
-                        Child.send('Hello from the parent!');
-                        Child.on('exit', (code, signal) => {
-                            console.log(`Child process exited with code ${code} and signal ${signal}`);
-                            let stream = db.getOne(userID, 'stream')
-                            let index = livechats.findIndex((stream2) => {
-                                return stream2 == stream.id;
-                            });
-                            livechats.splice(index, 1);
-                            children.splice(index, 1);
-                            checkLiveChannels();
-                        });
-                    }
-                    res.send({ "success": "true" })
-                } else {
-                    if (stream.live) {
-                        if (stream.live) {
-                            stream.live = false;
-                            db.overwriteOne(userID, 'stream', stream)
-                            let index = livechats.findIndex((stream) => {
-                                return stream == user.stream.id;
-                            });
-                            livechats.splice(index, 1);
-                            children[index].kill();
-                            children.splice(index, 1);
-                        }
-                    }
-                    res.send({ "failed": "true" })
-                }
-            })
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+            checkLiveChannels()
         } else {
             res.send('Error')
         }
@@ -458,69 +347,54 @@ app.post('/checkforstream', async (req, res) => {
 
 
 app.get('/logs/:min/:max', async (req, res) => {
-    if (req.cookies['chatbot']) {
-        let userID = "UCSgk1g0AZi9_759yfz-iIHg"
-        let logs = await db.getOne(userID, 'messages')
-        if (userID) {
-            let things = [...logs];
-            things = things.reverse();
-            things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
-            res.send(things)
-        } else {
-            res.send('Error')
-        }
+    let logs = await db.getOne('messages')
+    if (logs) {
+        let things = [...logs];
+        things = things.reverse();
+        things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
+        res.send(things)
     } else {
-        res.send('Unauthorized')
+        res.send('Error')
     }
 });
 
 app.get('/totals', async (req, res) => {
-    if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let users = await db.getOne(userID, 'users')
-        let stream = await db.getOne(userID, 'stream')
-        let votes = await db.getOne(userID, 'votes')
-        if (userID && users && stream && votes) {
-            let messages = stream.messages;
-            let points = 0;
-            let hours = 0;
-            let xp = 0;
-            let voteCount = 0;
-            for (let i = 0; i < users.length; i++) {
-                points += parseFloat(users[i].points);
-                hours += parseFloat(users[i].hours);
-                xp += parseFloat(users[i].xp);
-            }
-            for (let i = 0; i < votes.length; i++) {
-                voteCount += parseFloat(votes[i].votes);
-            }
-            res.send({
-                messages: messages,
-                points: points,
-                hours: hours,
-                xp: xp,
-                users: users.length,
-                votes: voteCount
-            })
-        } else {
-            res.send('Error')
+    let users = await db.getOne('users')
+    let stream = await db.getOne('stream')
+    let votes = await db.getOne('votes')
+    if (users && stream && votes) {
+        let messages = stream.messages;
+        let points = 0;
+        let hours = 0;
+        let xp = 0;
+        let voteCount = 0;
+        for (let i = 0; i < users.length; i++) {
+            points += parseFloat(users[i].points);
+            hours += parseFloat(users[i].hours);
+            xp += parseFloat(users[i].xp);
         }
+        for (let i = 0; i < votes.length; i++) {
+            voteCount += parseFloat(votes[i].votes);
+        }
+        res.send({
+            messages: messages,
+            points: points,
+            hours: hours,
+            xp: xp,
+            users: users.length,
+            votes: voteCount
+        })
     } else {
-        res.send('Unauthorized')
+        res.send('Error')
     }
 });
 
 app.get('/votes', async (req, res) => {
-    if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let votes = await db.getOne(userID, 'votes')
-        if (userID) {
-            res.send(votes)
-        } else {
-            res.send('Error')
-        }
+    let votes = await db.getOne('votes')
+    if (votes) {
+        res.send(votes)
     } else {
-        res.send('Unauthorized')
+        res.send('Error')
     }
 });
 
@@ -535,55 +409,54 @@ app.get('/odometer.css', async (req, res) => {
 });
 
 app.get('/dashboard', async (req, res) => {
+    let key = ""
     if (req.cookies['chatbot']) {
-        let userAuth = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let userID = "UCSgk1g0AZi9_759yfz-iIHg"
-        let commands = await db.getOne(userID, 'commands')
-        let connection = await db.getOne(userID, 'connection')
-        let counting = await db.getOne(userID, 'counting')
-        let currency = await db.getOne(userID, 'currency')
-        let giveaway = await db.getOne(userID, 'giveaway')
-        let messages = await db.getOne(userID, 'messages')
-        let moderation = await db.getOne(userID, 'moderation')
-        let playlist = await db.getOne(userID, 'playlist')
-        let quotes = await db.getOne(userID, 'quotes')
-        let settings = await db.getOne(userID, 'settings')
-        let stream = await db.getOne(userID, 'stream')
-        let timers = await db.getOne(userID, 'timers')
-        let users = await db.getOne(userID, 'users')
-        let votes = await db.getOne(userID, 'votes')
-        let user = {
-            id: userID,
-            commands: commands,
-            connection: connection,
-            counting: counting,
-            currency: currency,
-            giveaway: giveaway,
-            messages: messages,
-            moderation: moderation,
-            playlist: playlist,
-            quotes: quotes,
-            settings: settings,
-            stream: stream,
-            timers: timers,
-            users: users,
-            votes: votes
+        key = req.cookies['chatbot']
+        let real = await db.findUserIdFromToken(req.cookies['chatbot']);
+        if (!real) {
+            res.clearCookie('chatbot');
+            res.redirect('/dashboard')
         }
-        let auth = false;
-        if (userAuth) {
-            auth = true;
-        }
-        res.render(__dirname + '/web/dashboard.ejs', { user: user, stringify: stringify, relativeTime: relativeTime, auth: auth });
-    } else {
-        res.redirect('/connect');
     }
+    let userAuth = await db.findUserIdFromToken(req.cookies['chatbot']);
+    let commands = await db.getOne('commands')
+    let connection = await db.getOne('connection')
+    let counting = await db.getOne('counting')
+    let giveaway = await db.getOne('giveaway')
+    let messages = await db.getOne('messages')
+    let moderation = await db.getOne('moderation')
+    let quotes = await db.getOne('quotes')
+    let settings = await db.getOne('settings')
+    let stream = await db.getOne('stream')
+    let timers = await db.getOne('timers')
+    let users = await db.getOne('users')
+    let votes = await db.getOne('votes')
+    let user = {
+        id: connection.channel.id,
+        commands: commands,
+        connection: connection,
+        counting: counting,
+        giveaway: giveaway,
+        messages: messages,
+        moderation: moderation,
+        quotes: quotes,
+        settings: settings,
+        stream: stream,
+        timers: timers,
+        users: users,
+        votes: votes
+    }
+    let auth = false;
+    if (userAuth) {
+        auth = true;
+    }
+    res.render(__dirname + '/web/dashboard.ejs', { user: user, stringify: stringify, relativeTime: relativeTime, auth: auth, res: res, key: key });
 });
 
 app.post('/addCommand', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let commands = await db.getOne(userID, 'commands')
-        if (userID) {
+        let commands = await db.getOne('commands')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.name && req.body.response && req.body.rank && req.body.cooldown) {
                 if (req.body.name.includes(' ')) {
                     res.status(400).send({
@@ -611,7 +484,7 @@ app.post('/addCommand', async (req, res) => {
                         }
                     }
                 }
-                db.addObject(userID, 'commands', {
+                db.addObject('commands', {
                     command: req.body.name,
                     response: req.body.response,
                     permission: req.body.rank,
@@ -645,9 +518,8 @@ app.post('/addCommand', async (req, res) => {
 
 app.post('/addTimer', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let timers = await db.getOne(userID, 'timers')
-        if (userID) {
+        let timers = await db.getOne('timers')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.text && req.body.interval) {
                 if (isNaN(parseFloat(req.body.interval))) {
                     res.status(400).send({
@@ -673,7 +545,7 @@ app.post('/addTimer', async (req, res) => {
                         }
                     }
                 }
-                db.addObject(userID, 'timers', {
+                db.addObject('timers', {
                     text: req.body.text,
                     interval: parseFloat(req.body.interval),
                     lastCalled: 0,
@@ -705,9 +577,8 @@ app.post('/addTimer', async (req, res) => {
 
 app.post('/editTimer', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let timers = await db.getOne(userID, 'timers')
-        if (userID) {
+        let timers = await db.getOne('timers')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.id && req.body.text && req.body.interval && req.body.enabled) {
                 if (isNaN(parseFloat(req.body.interval))) {
                     res.status(400).send({
@@ -725,8 +596,8 @@ app.post('/editTimer', async (req, res) => {
                 }
                 for (let i = 0; i < timers.length; i++) {
                     if (timers[i].id == req.body.id) {
-                        db.removeObject(userID, 'timers', 'id', req.body.id);
-                        db.addObject(userID, 'timers', {
+                        db.removeObject('timers', 'id', req.body.id);
+                        db.addObject('timers', {
                             text: req.body.text,
                             interval: parseFloat(req.body.interval),
                             lastCalled: 0,
@@ -765,13 +636,12 @@ app.post('/editTimer', async (req, res) => {
 
 app.post('/removeTimer', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let timers = await db.getOne(userID, 'timers')
-        if (userID) {
+        let timers = await db.getOne('timers')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.id) {
                 for (let i = 0; i < timers.length; i++) {
                     if (timers[i].id == req.body.id) {
-                        db.removeObject(userID, 'timers', 'id', req.body.id);
+                        db.removeObject('timers', 'id', req.body.id);
                         res.status(200).send({
                             success: true
                         });
@@ -804,13 +674,12 @@ app.post('/removeTimer', async (req, res) => {
 
 app.post('/removeCommand', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let commands = await db.getOne(userID, 'commands')
-        if (userID) {
+        let commands = await db.getOne('commands')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.name) {
                 for (let i = 0; i < commands.length; i++) {
                     if (commands[i].command == req.body.name) {
-                        db.removeObject(userID, 'commands', 'id', commands[i].id);
+                        db.removeObject('commands', 'id', commands[i].id);
                         res.status(200).send({
                             success: true
                         });
@@ -843,9 +712,8 @@ app.post('/removeCommand', async (req, res) => {
 
 app.post('/editCommand', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot'])
-        let commands = await db.getOne(userID, 'commands')
-        if (userID) {
+        let commands = await db.getOne('commands')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.name && req.body.response && req.body.rank && req.body.cooldown) {
                 if (req.body.name.includes(' ')) {
                     res.status(400).send({
@@ -856,7 +724,7 @@ app.post('/editCommand', async (req, res) => {
                 }
                 for (let i = 0; i < commands.length; i++) {
                     if (commands[i].command == req.body.name) {
-                        db.overwriteObjectInArray(userID, 'commands', 'id', commands[i].id, {
+                        db.overwriteObjectInArray('commands', 'id', commands[i].id, {
                             command: req.body.name,
                             response: req.body.response,
                             permission: req.body.rank,
@@ -879,7 +747,7 @@ app.post('/editCommand', async (req, res) => {
                 if (req.body.id && req.body.used) {
                     for (let i = 0; i < commands.length; i++) {
                         if (commands[i].id == req.body.id) {
-                            db.overwriteObjectInArray(userID, 'commands', 'id', commands[i].id, {
+                            db.overwriteObjectInArray('commands', 'id', commands[i].id, {
                                 command: commands[i].command,
                                 response: commands[i].response,
                                 permission: commands[i].permission,
@@ -915,34 +783,27 @@ app.post('/editCommand', async (req, res) => {
 });
 
 app.get('/chat', async (req, res) => {
-    if (req.cookies['chatbot']) {
-        try {
-            let userID = "UCSgk1g0AZi9_759yfz-iIHg"
-            let messages = [...await db.getOne(userID, 'messages')]
-            if (userID) {
-                messages = messages.sort((a, b) => {
-                    return parseFloat(a.timestampUsec) - parseFloat(b.timestampUsec);
-                });
-                res.status(200).send({
-                    messages: messages.slice(-25),
-                    success: true
-                });
-            } else {
-                res.status(401).send({
-                    error: 'Unauthorized',
-                    success: false
-                });
-            }
-        } catch (e) {
-            console.log(e)
-            res.status(404).send({
-                error: 'Not found',
+    try {
+        let messages = await db.getOne('messages')
+        if (messages) {
+            messages = [...messages]
+            messages = messages.sort((a, b) => {
+                return parseFloat(a.timestampUsec) - parseFloat(b.timestampUsec);
+            });
+            res.status(200).send({
+                messages: messages.slice(-25),
+                success: true
+            });
+        } else {
+            res.status(401).send({
+                error: 'unknown error',
                 success: false
             });
         }
-    } else {
-        res.status(401).send({
-            error: 'Unauthorized',
+    } catch (e) {
+        console.log(e)
+        res.status(404).send({
+            error: 'Not found',
             success: false
         });
     }
@@ -952,7 +813,7 @@ app.get('/connect', async (req, res) => {
     if (req.cookies['chatbot']) {
         let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
         if (userID) {
-            res.redirect('/dashboard');
+            res.redirect('/restore')
         } else {
             res.render(__dirname + '/web/connect.ejs');
         }
@@ -961,12 +822,80 @@ app.get('/connect', async (req, res) => {
     }
 });
 
+app.get('/login', async (req, res) => {
+    res.sendFile(__dirname + '/web/login.html');
+});
+
+app.get('/login/:token', async (req, res) => {
+    res.cookie('chatbot', req.params.token, { maxAge: 31556952000 });
+    res.redirect('/dashboard')
+});
+
+app.get('/restore', async (req, res) => {
+    if (req.cookies['chatbot']) {
+        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+        if (userID) {
+            let backups = fs.readdirSync('./user/archives');
+            backups.sort(function (a, b) {
+                return fs.statSync('./user/archives/' + b).mtime.getTime() -
+                    fs.statSync('./user/archives/' + a).mtime.getTime();
+            });
+            res.render(__dirname + '/web/restore.ejs', { backups: backups });
+        } else {
+            res.redirect('/')
+        }
+    } else {
+        res.render(__dirname + '/web/connect.ejs');
+    }
+});
+
+app.post('/restore/:date', async (req, res) => {
+    if (req.cookies['chatbot']) {
+        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+        if (userID) {
+            let backups = fs.readdirSync('./user/archives');
+            if (backups.includes(req.params.date)) {
+                let a = false;
+                if ((Child != undefined) || (Child != "")) {
+                    Child.kill();
+                    Child = "";
+                    a = true;
+                }
+                let file = fs.readFileSync('./user/archives/' + req.params.date);
+                let json = JSON.parse(file);
+                fs.writeFileSync('./user/db/commands.json', JSON.stringify(json.commands));
+                fs.writeFileSync('./user/db/connection.json', JSON.stringify(json.connection));
+                fs.writeFileSync('./user/db/counting.json', JSON.stringify(json.counting));
+                fs.writeFileSync('./user/db/giveaway.json', JSON.stringify(json.giveaway));
+                fs.writeFileSync('./user/db/ids.json', JSON.stringify(json.ids));
+                fs.writeFileSync('./user/db/messages.json', JSON.stringify(json.messages));
+                fs.writeFileSync('./user/db/moderation.json', JSON.stringify(json.moderation));
+                fs.writeFileSync('./user/db/settings.json', JSON.stringify(json.settings));
+                fs.writeFileSync('./user/db/stream.json', JSON.stringify(json.stream));
+                fs.writeFileSync('./user/db/timers.json', JSON.stringify(json.timers));
+                fs.writeFileSync('./user/db/users.json', JSON.stringify(json.users));
+                fs.writeFileSync('./user/db/votes.json', JSON.stringify(json.votes));
+                res.send({ success: true })
+                if (a) {
+                    checkLiveChannels()
+                }
+            } else {
+                res.status(404).send({ error: 'Not found' })
+            }
+        } else {
+            res.status(401).send({ error: 'Unauthorized' })
+        }
+    } else {
+        res.status(401).send({ error: 'Unauthorized' })
+    }
+});
+
 app.post('/connect', async (req, res) => {
-    if (req.body.SSID && req.body.SID && req.body.HSID && req.body.APISID && req.body.SAPISID && req.body.channelID) {
-        let users = fs.readdirSync('./users');
+    if (req.body.channelID && req.body.botID) {
+        let users = fs.readdirSync('./user');
         for (let i = 0; i < users.length; i++) {
             if (users[i] == "key.json") continue;
-            if (fs.existsSync('./users/' + users[i] + '')) {
+            if (fs.existsSync('./user')) {
                 res.send({
                     error: 'Account already exists',
                     success: false
@@ -974,10 +903,52 @@ app.post('/connect', async (req, res) => {
                 return;
             }
         }
-        let url = "https://axern.space/api/youtube/channel/" + req.body.channelID;
-        const { body } = await request(url);
-        let bodyJson = await body.json();
-        if (bodyJson) {
+        let bodyJson;
+        let bodyJson2;
+        async function getChannels() {
+            try {
+                let url = "https://axern.space/api/get?platform=youtube&type=channel&id=" + req.body.channelID;
+                setTimeout(() => {
+                    if (!bodyJson) {
+                        res.status(400).send({
+                            error: 'Streamer channel does not exist',
+                            success: false
+                        })
+                        return;
+                    }
+                }, 10000);
+                const { body } = await request(url);
+                bodyJson = await body.json();
+            } catch (e) {
+                res.status(400).send({
+                    error: 'Streamer channel does not exist',
+                    success: false
+                })
+                return;
+            }
+            try {
+                let url = "https://axern.space/api/get?platform=youtube&type=channel&id=" + req.body.botID;
+                setTimeout(() => {
+                    if (!bodyJson2) {
+                        res.status(400).send({
+                            error: 'Bot channel does not exist',
+                            success: false
+                        })
+                        return;
+                    }
+                }, 10000);
+                const { body } = await request(url);
+                bodyJson2 = await body.json();
+            } catch (e) {
+                res.status(400).send({
+                    error: 'Bot channel does not exist',
+                    success: false
+                })
+                return;
+            }
+        }
+        await getChannels();
+        if (bodyJson && bodyJson2) {
             let newUser = {
                 "id": req.body.channelID,
                 "created": new Date().getTime(),
@@ -987,6 +958,10 @@ app.post('/connect', async (req, res) => {
                     "channel": {
                         "id": req.body.channelID,
                         "snippet": bodyJson.snippet
+                    },
+                    "bot": {
+                        "id": req.body.botID,
+                        "snippet": bodyJson2.snippet
                     }
                 },
                 "messages": [],
@@ -1127,11 +1102,6 @@ app.post('/connect', async (req, res) => {
                         "id": "0bz3k5"
                     }
                 ],
-                "playlist": {
-                    "currentID": "",
-                    "currentTitle": "",
-                    "url": ""
-                },
                 "quotes": [],
                 "timers": [],
                 "users": [],
@@ -1170,52 +1140,36 @@ app.post('/connect', async (req, res) => {
                     "messagesPer10Seconds": "4",
                     "messagesPer10SecondsEnabled": false,
                     "enabled": false
-                },
-                "currency": {
-                    "minXP": 1,
-                    "maxXP": 1,
-                    "xpPerLevel": 100,
-                    "customLevelNames": []
                 }
             }
-            fs.mkdirSync('./users/' + req.body.channelID);
-            fs.mkdirSync('./users/' + req.body.channelID + '/db');
-            fs.mkdirSync('./users/' + req.body.channelID + '/archives');
-            fs.mkdirSync('./users/' + req.body.channelID + '/files');
-            fs.mkdirSync('./users/' + req.body.channelID + '/streams');
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/commands.json', JSON.stringify(newUser.commands));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/connection.json', JSON.stringify(newUser.connection));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/counting.json', JSON.stringify(newUser.counting));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/currency.json', JSON.stringify(newUser.currency));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/giveaway.json', JSON.stringify(newUser.giveaway));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/messages.json', JSON.stringify(newUser.messages));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/moderation.json', JSON.stringify(newUser.moderation));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/playlist.json', JSON.stringify(newUser.playlist));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/quotes.json', JSON.stringify(newUser.quotes));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/settings.json', JSON.stringify(newUser.settings));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/stream.json', JSON.stringify(newUser.stream));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/timers.json', JSON.stringify(newUser.timers));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/users.json', JSON.stringify(newUser.users));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/votes.json', JSON.stringify(newUser.votes));
-            fs.writeFileSync('./users/' + req.body.channelID + '/db/ids.json', JSON.stringify([]));
-            let token = Math.random().toString(36).substring(7);
-            let keys = JSON.parse(fs.readFileSync('./users/key.json'));
+            fs.mkdirSync('./user/db');
+            fs.mkdirSync('./user/archives');
+            fs.mkdirSync('./user/files');
+            fs.mkdirSync('./user/streams');
+            fs.writeFileSync('./user/db/commands.json', JSON.stringify(newUser.commands));
+            fs.writeFileSync('./user/db/connection.json', JSON.stringify(newUser.connection));
+            fs.writeFileSync('./user/db/counting.json', JSON.stringify(newUser.counting));
+            fs.writeFileSync('./user/db/giveaway.json', JSON.stringify(newUser.giveaway));
+            fs.writeFileSync('./user/db/messages.json', JSON.stringify(newUser.messages));
+            fs.writeFileSync('./user/db/moderation.json', JSON.stringify(newUser.moderation));
+            fs.writeFileSync('./user/db/quotes.json', JSON.stringify(newUser.quotes));
+            fs.writeFileSync('./user/db/settings.json', JSON.stringify(newUser.settings));
+            fs.writeFileSync('./user/db/stream.json', JSON.stringify(newUser.stream));
+            fs.writeFileSync('./user/db/timers.json', JSON.stringify(newUser.timers));
+            fs.writeFileSync('./user/db/users.json', JSON.stringify(newUser.users));
+            fs.writeFileSync('./user/db/votes.json', JSON.stringify(newUser.votes));
+            fs.writeFileSync('./user/db/ids.json', JSON.stringify([]));
+            let token = Math.random().toString(36)
+            let keys = JSON.parse(fs.readFileSync('./user/key.json'));
             keys[token] = newUser.id;
-            fs.writeFileSync('./users/key.json', JSON.stringify(keys));
-            fs.writeFile('./users/' + newUser.id + '/credentials.json', JSON.stringify({
-                SAPISID: req.body.SAPISID,
-                APISID: req.body.APISID,
-                HSID: req.body.HSID,
-                SID: req.body.SID,
-                SSID: req.body.SSID
-            }), (err) => { });
+            fs.writeFileSync('./user/key.json', JSON.stringify(keys));
             res.cookie('chatbot', token, { maxAge: 31556952000, httpOnly: true });
             res.send({
                 success: true
             })
         } else {
             res.send({
-                error: 'Invalid channel ID',
+                error: 'Invalid channel IDs',
                 success: false
             })
         }
@@ -1232,88 +1186,66 @@ app.get('/logout', async (req, res) => {
     res.redirect('/');
 });
 
-let livechats = [];
-let children = [];
 async function checkLiveChannels() {
     try {
-        let users = fs.readdirSync('./users');
-        users = users.filter((user) => {
-            if (!fs.lstatSync('./users/' + user).isDirectory()) return;
-            let settings = JSON.parse(fs.readFileSync('./users/' + user + '/db/settings.json'));
-            if (settings.chatbot.enabled) {
-                return true;
+        if (!fs.existsSync('./user/db')) return false;
+        let settings = JSON.parse(fs.readFileSync('./user/db/settings.json'));
+        if (settings && settings.chatbot) {
+            if (!settings.chatbot.enabled) {
+                return false;
             }
-        });
-        if (users) {
-            users.forEach((user) => {
-                let connection = JSON.parse(fs.readFileSync('./users/' + user + '/db/connection.json'));
-                let stream = JSON.parse(fs.readFileSync('./users/' + user + '/db/stream.json'));
-                let userId = connection.channel.id;
-                if (connection.channel) {
-                    function redoThing(user, already) {
-                        getStream(userId, stream.id).then((stream2) => {
-                            if (stream2.stream) {
-                                if (!livechats.includes(stream2.stream.id)) {
-                                    let lcmessages = stream.messages;
-                                    if (stream.id != stream2.stream.id) {
-                                        lcmessages = 0;
-                                    }
-                                    livechats.push(stream2.stream.id);
-                                    db.overwriteOne(userId, 'stream', {
-                                        id: stream2.stream.id,
-                                        title: stream2.stream.title,
-                                        thumbnail: 'https://i.ytimg.com/vi/' + stream2.stream.id + '/hqdefault.jpg',
-                                        live: true,
-                                        messages: lcmessages,
-                                        viewers: stream2.stream.viewers,
-                                        likes: stream2.stream.likes,
-                                    });
-                                    console.log(userId)
-                                    let Child = fork('chatbot.js', [userId, stream.id]);
-                                    Child.send('Hello from the parent!');
-                                    Child.on('exit', (code, signal) => {
-                                        console.log(`Child process exited with code ${code} and signal ${signal}`);
-                                        let stream = db.getOne(userId, 'stream')
-                                        let index = livechats.findIndex((stream2) => {
-                                            return stream2 == stream.id;
-                                        });
-                                        livechats.splice(index, 1);
-                                        children.splice(index, 1);
-                                        checkLiveChannels();
-                                    });
-                                    Child.on('error', (err) => {
-                                        console.log(err);
-                                    })
-                                    children.push(Child);
-                                }
+        }
+        let connection = JSON.parse(fs.readFileSync('./user/db/connection.json'));
+        let stream = JSON.parse(fs.readFileSync('./user/db/stream.json'));
+        if (connection.channel) {
+            function redoThing(already) {
+                getStream(connection.channel.id, stream.id).then((stream2) => {
+                    if (stream2.stream) {
+                        if ((Child == "") || (Child == undefined)) {
+                            let lcmessages = stream.messages;
+                            if (stream.id != stream2.stream.id) {
+                                lcmessages = 0;
+                            }
+                            db.overwriteOne('stream', {
+                                id: stream2.stream.id,
+                                title: stream2.stream.title,
+                                thumbnail: 'https://i.ytimg.com/vi/' + stream2.stream.id + '/hqdefault.jpg',
+                                live: true,
+                                messages: lcmessages,
+                                viewers: stream2.stream.viewers,
+                                likes: stream2.stream.likes,
+                            });
+                            Child = fork('chatbot.js', [connection.channel.id, stream2.stream.id, connection.bot.id]);
+                            Child.send('Hello from the parent!');
+                            Child.on('exit', (code, signal) => {
+                                console.log(`Child process exited with code ${code} and signal ${signal}`);
+                                Child = ""
+                                checkLiveChannels();
+                            });
+                            Child.on('error', (err) => {
+                                console.log(err);
+                            })
+                        } else {
+                            if (!already) {
+                                redoThing(true);
                             } else {
-                                if (!already) {
-                                    redoThing(user, true);
-                                } else {
-                                    if (stream.live) {
-                                        console.log('stream ended')
-                                        stream.live = false;
-                                        db.overwriteOne(userId, 'stream', stream);
-                                        let index = livechats.findIndex((stream) => {
-                                            return stream == stream.id;
-                                        });
-                                        if (index != -1) {
-                                            livechats.splice(index, 1);
-                                            children[index].kill();
-                                            children.splice(index, 1);
-                                            console.log('killed child')
-                                            console.log(livechats)
-                                            console.log(children)
-                                        }
-                                        redoThing(user, true);
+                                if (stream.live) {
+                                    console.log('stream ended')
+                                    stream.live = false;
+                                    db.overwriteOne('stream', stream);
+                                    if ((Child !== "") && (Child !== undefined)) {
+                                        Child.kill();
+                                        Child = "";
                                     }
+                                    redoThing(connection.channel.id, true);
+                                    checkLiveChannels();
                                 }
                             }
-                        });
+                        }
                     }
-                    redoThing(user, false);
-                }
-            })
+                });
+            }
+            redoThing(false);
         }
     } catch (err) {
         console.log(err);
@@ -1322,9 +1254,8 @@ async function checkLiveChannels() {
 
 app.post('/deleteMsg', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let stream = await db.getOne(userID, 'stream');
-        if (userID) {
+        let stream = await db.getOne('stream');
+        if (db.findUserIdFromToken(req.cookies['chatbot'])) {
             let index = livechats.findIndex((stream2) => {
                 return stream2 == stream.id;
             });
@@ -1356,9 +1287,8 @@ app.post('/deleteMsg', async (req, res) => {
 
 app.post('/timeout', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let stream = await db.getOne(userID, 'stream');
-        if (userID) {
+        let stream = await db.getOne('stream');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             let index = livechats.findIndex((stream2) => {
                 return stream2 == stream.id;
             });
@@ -1382,9 +1312,8 @@ app.post('/timeout', async (req, res) => {
 
 app.post('/ban', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let stream = await db.getOne(userID, 'stream');
-        if (userID) {
+        let stream = await db.getOne('stream');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             let index = livechats.findIndex((stream2) => {
                 return stream2 == stream.id;
             });
@@ -1408,16 +1337,15 @@ app.post('/ban', async (req, res) => {
 
 app.post('/updateUser', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let users = await db.getOne(userID, 'users');
-        if (userID) {
+        let users = await db.getOne('users');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             let subject = users.find(x => x.id == req.body.id);
             if (subject) {
                 if (req.body.type == 'warnings') {
-                    db.editWithinArray(userID, 'users', 'id', req.body.id, 'warns', [])
-                    db.editWithinArray(userID, 'users', 'id', req.body.id, 'allWarns', [])
+                    db.editWithinArray('users', 'id', req.body.id, 'warns', [])
+                    db.editWithinArray('users', 'id', req.body.id, 'allWarns', [])
                 } else {
-                    db.editWithinArray(userID, 'users', 'id', req.body.id, req.body.type, req.body.value);
+                    db.editWithinArray('users', 'id', req.body.id, req.body.type, req.body.value);
                 }
                 res.status(200).send({
                     success: true
@@ -1444,11 +1372,10 @@ app.post('/updateUser', async (req, res) => {
 
 app.post('/settings/moderation', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let moderation = await db.getOne(userID, 'moderation');
-        if (userID) {
+        let moderation = await db.getOne('moderation');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             moderation = req.body.moderation;
-            db.overwriteOne(userID, 'moderation', moderation);
+            db.overwriteOne('moderation', moderation);
             res.status(200).send({
                 success: true
             });
@@ -1518,21 +1445,20 @@ function relativeTime(previous) {
 
 app.get('/settings/enable', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let settings = await db.getOne(userID, 'settings');
-        let stream = await db.getOne(userID, 'stream');
-        if (userID) {
+        let settings = await db.getOne('settings');
+        let stream = await db.getOne('stream');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (settings.chatbot.enabled == false) {
                 settings.chatbot.enabled = true;
-                db.overwriteOne(userID, 'settings', settings);
-                getStream(userID, stream.id)
+                db.overwriteOne('settings', settings);
+                getStream(stream.id)
                 res.status(200).send({
                     success: true,
                     enabled: 'enabled'
                 });
             } else {
                 settings.chatbot.enabled = false;
-                db.overwriteOne(userID, 'settings', settings);
+                db.overwriteOne('settings', settings);
                 let index = livechats.findIndex((stream) => {
                     return stream == user.stream.id;
                 });
@@ -1559,23 +1485,15 @@ app.get('/settings/enable', async (req, res) => {
 });
 
 app.get('/filestore/:file', async (req, res) => {
-    if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        if (userID) {
-            let userDir = "./users/" + userID + "/files"
-            let file = req.params.file;
-            let path = userDir + "/" + file;
-            if (fs.existsSync(path)) {
-                res.sendFile(path, { root: __dirname });
-            } else {
-                res.status(404).send({
-                    error: 'File not found',
-                    success: false
-                });
-            }
+    if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let userDir = "./user/files"
+        let file = req.params.file;
+        let path = userDir + "/" + file;
+        if (fs.existsSync(path)) {
+            res.sendFile(path, { root: __dirname });
         } else {
-            res.status(400).send({
-                error: 'Invalid token',
+            res.status(404).send({
+                error: 'File not found',
                 success: false
             });
         }
@@ -1589,19 +1507,18 @@ app.get('/filestore/:file', async (req, res) => {
 
 app.get('/counting/enable', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let settings = await db.getOne(userID, 'settings');
-        if (userID) {
+        let settings = await db.getOne('settings');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (settings.counting.enabled) {
                 settings.counting.enabled = false;
-                db.overwriteOne(userID, 'settings', settings);
+                db.overwriteOne('settings', settings);
                 res.status(200).send({
                     success: true,
                     enabled: 'disabled'
                 });
             } else {
                 settings.counting.enabled = true;
-                db.overwriteOne(userID, 'settings', settings);
+                db.overwriteOne('settings', settings);
                 res.status(200).send({
                     success: true,
                     enabled: 'enabled'
@@ -1623,19 +1540,18 @@ app.get('/counting/enable', async (req, res) => {
 
 app.get('/currency/enable', async (req, res) => {
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        let settings = await db.getOne(userID, 'settings');
-        if (userID) {
+        let settings = await db.getOne('settings');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (settings.currency.enabled) {
                 settings.currency.enabled = false;
-                db.overwriteOne(userID, 'settings', settings);
+                db.overwriteOne('settings', settings);
                 res.status(200).send({
                     success: true,
                     enabled: 'disabled'
                 });
             } else {
                 settings.currency.enabled = true;
-                db.overWriteOne(userID, 'settings', settings);
+                db.overWriteOne('settings', settings);
                 res.status(200).send({
                     success: true,
                     enabled: 'enabled'
@@ -1651,7 +1567,7 @@ app.get('/currency/enable', async (req, res) => {
 });
 
 app.get('/public/live/chat/:id', async (req, res) => {
-    let dir = './users/' + req.params.id + "/db/messages.json";
+    let dir = './user/db/messages.json';
     if (fs.existsSync(dir)) {
         let messages = JSON.parse(fs.readFileSync(dir));
         messages = messages.sort((a, b) => {
@@ -1667,13 +1583,13 @@ app.get('/public/live/chat/:id', async (req, res) => {
     }
 });
 
-app.get('/public/currency/:id', async (req, res) => {
+app.get('/public/currency', async (req, res) => {
     res.render(__dirname + '/web/public.ejs');
 });
 
-app.get('/public/currency/:uid/user', async (req, res) => {
+app.get('/public/currency/user', async (req, res) => {
     try {
-        let dir = './users/' + req.params.uid + "/db/users.json";
+        let dir = './user/db/users.json';
         if (fs.existsSync(dir)) {
             let currency = JSON.parse(fs.readFileSync(dir));
             if (req.query.id) {
@@ -1772,9 +1688,9 @@ app.get('/public/currency/:uid/user', async (req, res) => {
     }
 });
 
-app.post('/public/currency/:id', async (req, res) => {
+app.post('/public/currency', async (req, res) => {
     try {
-        let dir = './users/' + req.params.id + "/db/users.json";
+        let dir = './user/db/users.json';
         if (fs.existsSync(dir)) {
             let currency = JSON.parse(fs.readFileSync(dir));
             if (req.query.uid) {
@@ -2089,19 +2005,11 @@ app.post('/public/currency/:id', async (req, res) => {
 checkLiveChannels();
 
 setInterval(() => {
-    for (let i = 0; i < children.length; i++) {
-        children[i].kill();
-    }
-    children = [];
-    livechats = [];
+    Child.kill()
+    Child = "";
     checkLiveChannels();
 }, 1000 * 60 * 60);
 
-setInterval(() => {
-    console.log(livechats, livechats.length);
-    console.log(children.length);
-}, 10000)
-
 app.listen(8080, () => {
-    console.log('Server started on port 8080');
+    console.log('Server started: http://localhost:8080');
 });

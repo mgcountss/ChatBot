@@ -61,6 +61,21 @@
             text-align: center;
             font-size: 1vw;
         }
+
+        p {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+        input {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+        label {
+            margin-top: 0px;
+            font-size: 0.3em;
+        }
     </style>
 </head>
 
@@ -70,9 +85,11 @@
     <hr>
     <p>Welcome to MGBot, the next great (maybe) YouTube live stream chatbot!</p>
     <p>Currently, MGBot is in development, and is not yet ready for use.</p>
-    <button onclick="start()">Get Started!</button><br>
-    <button onclick="window.location.href = '/public/currency'">View Points Data</button><br>
-    <a href="login" style="font-size: 1.5vw; color: #FFF;">Already have a code?</a>
+    <hr>
+    <h6>Select a backup to restore from (Year-Month-Day-Hour)</h6><hr>
+        <% backups.forEach(backup => { %>
+        <button onclick="restore('<%= backup %>')"><%= backup.split('.')[0] %></button>
+        <% }) %>
     <hr>
     <h6>Current List of Features</h6>
     <ul>
@@ -92,8 +109,22 @@
     </ul>
     <hr>
     <script>
-        function start() {
-            window.location.href = "/dashboard";
+        function restore(backup) {
+            let a = confirm('Are you sure you want to restore from ' + backup + '? (This will overwrite your current data)');
+            if (a) {
+                fetch('/restore/' + backup, {
+                    method: 'POST'
+                }).then(res => {
+                    if (res.status == 200) {
+                        alert('Successfully restored from ' + backup);
+                        window.location.href = '/dashboard';
+                    } else {
+                        alert('Failed to restore from ' + backup);
+                    }
+                }).catch(err => {
+                    alert('Failed to restore from ' + backup);
+                });
+            }
         }
     </script>
 </body>

@@ -38,7 +38,8 @@
     }
 </style>
 <center>
-    <a href="./compare/search" style="font-size: 4vw;">Compare</a><br>
+    <a href="" style="font-size: 4vw;">Compare</a><br>
+    <h3>COMING SOON</h3>
     <hr style="background-color: #FFF;">
     <h1 style="font-size: 2vw;">Total Users</h1>
     <h1 style="font-size: 4vw;" class="odometer" id="total">0</h1>
@@ -94,7 +95,7 @@
             lastSearch = search
             $('.counters').html('')
         }
-        fetch("/public/currency/" + document.URL.split('/currency/')[1] + "?offset=" + offset + "&limit=" + limit + "&sort=" + sort + "&order=" + order + "" + search, {
+        fetch("/public/currency/?offset=" + offset + "&limit=" + limit + "&sort=" + sort + "&order=" + order + "" + search, {
             method: "POST",
             headers: {
                 'Content-Type': 'application/json'
@@ -134,7 +135,7 @@
     }
 
     function ee(elmnt) {
-        window.location.href = "/public/currency/" + document.URL.split('/currency/')[1] + "/user?id=" + elmnt.getAttribute('cid')
+        window.location.href = "/public/currency/user?id=" + elmnt.getAttribute('cid')
     }
 
     function sortData(by) {

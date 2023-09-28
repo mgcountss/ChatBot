@@ -1,3 +1,4 @@
+<% if ((!user.connection) || (!user.connection.channel)) {res.redirect('/connect')}%>
 <!DOCTYPE html>
 <html>
 
@@ -98,6 +99,7 @@
             transform: translate(-50%, -50%);
             border: solid 0.3vw #000;
             text-align: center;
+            overflow: scroll;
         }
 
         .popup-content {
@@ -133,7 +135,6 @@
                 <li id="commands">Commands</li>
                 <li id="users">Users</li>
                 <li id="votes">Votes</li>
-                <li id="musicPlayer">Music Player</li>
                 <li id="giveaway">Giveaway</li>
                 <li id="timers">Timers</li>
                 <li id="quotes">Quotes</li>
@@ -145,10 +146,12 @@
         <div class="main" id="main">
             <div class="dashboard tab">
                 <div>
-                    <button onclick="enableBot()">
-                        <%if (user.settings.chatbot.enabled==false) { %>Enable Bot<% } else { %>Disable Bot<% } %>
-                    </button>
-                    </h2><br><br>
+                    </h2><br>
+                    <% if (auth) {%>
+                        <h5>(write this down somewhere) (DO NOT SHARE) CODE: <h1 code="<%=key%>" onclick="showCode()" id="code">click to show</h1></h5>
+                        <%}%>
+                    <button style="font-size: 2vw;" onclick="window.location.href = '/public/currency'">View Points Data</button><br>
+                    <hr>
                     <img src="<%=user.connection.channel.snippet.thumbnails.medium.url%>" alt="Channel Thumbnail"
                         style="height: 4vw;">
                     <h3>You are connected to <%=user.connection.channel.snippet.title%>!</h3>
@@ -165,6 +168,9 @@
                     <label>Don't see your stream?</label><br>
                     <button id="refresh" onclick="checkforstream()">Refresh Stream!</button>
                     <hr>
+                    <button onclick="enableBot()">
+                        <%if (user.settings.chatbot.enabled==false) { %>Enable Bot<% } else { %>Disable Bot<% } %>
+                    </button>
                     <button id="logout">Logout</button><br><br>
                 </div>
             </div>
@@ -513,22 +519,6 @@
                     </tr>
                 </table>
             </div>
-            <div class="musicPlayer tab">
-                <center>
-                    <input id="playlist" value="<%=user.playlist.url%>" placeholder="Playlist URL" style="width: 70%">
-                    <button onclick="setPlaylist()">Set Playlist</button>
-                    <br>
-                    <hr>
-                    <br>
-                    <div id="player"></div>
-                    <br>
-                    <h1 id="songTitle"></h1>
-                    <button onclick="playVideo()">Play</button>
-                    <button onclick="stopVideo()">Stop</button>
-                    <button onclick="nextVideo()">Next</button>
-                    <button onclick="previousVideo()">Previous</button>
-                </center>
-            </div>
             <div class="giveaway tab"><br>
                 <div style="display: grid; grid-template-columns: 2fr 5fr;">
                     <div id="entered" style="border: solid 5px #fff;">
@@ -722,89 +712,6 @@
         </div>
     </div>
     <script>
-        var tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        var firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-        var player;
-        var index = 0;
-        function onYouTubeIframeAPIReady() {
-            player = new YT.Player('player', {
-                height: '390',
-                width: '640',
-                playerVars:
-                {
-                    listType: 'playlist',
-                    list: '<%=user.playlist.url.split("list=")[1]%>',
-                    index: index
-                },
-                events: {
-                    'onStateChange': onPlayerStateChange,
-                }
-            });
-        }
-        function setPlaylist() {
-            fetch("/updatePlaylist", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    playlist: document.getElementById("playlist").value
-                })
-            }).then(function (response) {
-                return response.json();
-            }).then(function (data) {
-                if (data.success) {
-                    alert("Playlist updated successfully!");
-                    index = 0;
-                    player.destroy();
-                    player = new YT.Player('player', {
-                        height: '390',
-                        width: '640',
-                        playerVars:
-                        {
-                            listType: 'playlist',
-                            list: document.getElementById("playlist").value.split("list=")[1],
-                            index: index
-                        },
-                        events: {
-                            'onStateChange': onPlayerStateChange,
-                        }
-                    });
-                } else {
-                    alert("Error updating playlist!");
-                }
-            })
-        }
-
-        function onPlayerStateChange(event) {
-            fetch("/updatePlaylist", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    "id": player.getVideoData().video_id,
-                    "playlist": '<%=user.playlist.url%>',
-                    "title": player.getVideoData().title
-                })
-            });
-            document.getElementById("songTitle").innerHTML = player.getVideoData().title;
-        }
-        function playVideo() {
-            player.playVideo();
-        }
-        function stopVideo() {
-            player.stopVideo();
-        }
-        function nextVideo() {
-            player.nextVideo();
-        }
-        function previousVideo() {
-            player.previousVideo();
-        }
-
         function saveGiveaway() {
             const giveaway = {
                 "prize": document.getElementById("prize").value,
@@ -1761,6 +1668,10 @@
                     alert('Error: ' + json.error);
                 }
             })
+        }
+
+        function showCode() {
+            document.getElementById("code").innerHTML = document.getElementById("code").getAttribute("code");
         }
     </script>
 </body>

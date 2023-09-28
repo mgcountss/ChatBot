@@ -70,9 +70,10 @@
     <hr>
     <p>Welcome to MGBot, the next great (maybe) YouTube live stream chatbot!</p>
     <p>Currently, MGBot is in development, and is not yet ready for use.</p>
-    <button onclick="start()">Get Started!</button><br>
-    <button onclick="window.location.href = '/public/currency'">View Points Data</button><br>
-    <a href="login" style="font-size: 1.5vw; color: #FFF;">Already have a code?</a>
+    <hr>
+    <h4 style="margin-bottom: 0px">Enter Code:</h4>
+    <input id="i" style="margin-top: 0px; font-size: 2vw; width: 80%;" placeholder="Code"><br>
+    <button onclick="login()">Login</button>
     <hr>
     <h6>Current List of Features</h6>
     <ul>
@@ -92,8 +93,9 @@
     </ul>
     <hr>
     <script>
-        function start() {
-            window.location.href = "/dashboard";
+        function login() {
+            var code = document.getElementById("i").value;
+            window.location.href = "/login/" + code;
         }
     </script>
 </body>
