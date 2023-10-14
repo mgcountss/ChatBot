@@ -654,7 +654,9 @@
                         <th>Message</th>
                     </tr>
                     <% let length3=user.users.length; %>
+                    <% if (user.messages) { %>
                         <% user.messages.reverse(); %>
+                        <%}%>
                             <% if (user.messages.length>= 30) { %>
                                 <% length3=30; %>
                                     <% } %>
@@ -1104,7 +1106,7 @@
             document.getElementById("chatBoard").scrollTop = document.getElementById("chatBoard").scrollHeight;
         });
 
-        let chatInterval = setInterval(getChat, 1000);
+        let chatInterval = setInterval(getChat, 5000);
         function getChat() {
             fetch('/chat')
                 .then(response => response.json())
@@ -1120,9 +1122,18 @@
                             let message = document.createElement("div");
                             message.classList.add("chat-item");
                             message.setAttribute("id", data.messages[i].id);
+                            let color = "#FFF"
+                            if (data.messages[i].isOwner == true) {
+                                color = "#FFD700"
+                                console.log("owner", data.messages[i].authorName, data.messages[i])
+                            } else if (data.messages[i].isModerator == true) {
+                                color = "#00BFFF"
+                            } else if (data.messages[i].isVerified == true) {
+                                color = "#00FFFF"
+                            }
                             message.innerHTML = `
                             <img src="${data.messages[i].authorPhoto}" style="float: left; width: 50px; height: 50px; border-radius: 50%;">
-                            <p class="chatName">${data.messages[i].authorName}</p>
+                            <p class="chatName" style="color: ${color}">${data.messages[i].authorName}</p>
                             <p class="chatMessage">${stringify(data.messages[i].message)}</p>`
                             message.onclick = function () { popup('chat', data.messages[i].id + '', '' + data.messages[i].authorName + '', '' + data.messages[i].authorChannelId + '', '' + data.messages[i].authorPhoto + '', '' + data.messages[i].timestamp + '', '' + data.messages[i].message + '') }
                             chat.appendChild(message);
@@ -1576,7 +1587,7 @@
                     `
                 })
         }
-        setInterval(updateGiveaway, 5000)
+        setInterval(updateGiveaway, 10000)
 
         function updateUses(id) {
             fetch('/editCommand', {

@@ -202,7 +202,7 @@
     let chartData3 = []
     let chartData4 = []
     function subs() {
-        fetch("/public/currency/" + window.location.href.split("/currency/")[1].split('/user')[0] + "?uid=" + id, {
+        fetch("/public/currency/?uid=" + id, {
             method: "POST",
             headers: {
                 'Content-Type': 'application/json'
