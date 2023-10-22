@@ -26,6 +26,7 @@ if (!fs.existsSync('./user')) {
 }
 
 async function getStream(id, id2) {
+    console.log(id, id2)
     try {
         let url = 'https://www.youtube.com/watch?v=' + id2;
         const { body } = await request(url);
@@ -782,7 +783,7 @@ app.post('/restore/:date', async (req, res) => {
             if (backups.includes(req.params.date)) {
                 let a = false;
                 if ((Child != undefined) || (Child != "")) {
-                    Child.kill();
+                    Child.send('end');
                     Child = "";
                     a = true;
                 }
@@ -1126,7 +1127,13 @@ async function checkLiveChannels() {
         let stream = JSON.parse(fs.readFileSync('./user/db/stream.json'));
         if (connection.channel) {
             function redoThing(already) {
+                if ((stream.id != "") && (stream.id != undefined) && (stream.id != null) && (stream.id.length > 0)) {
+                    if (already) {
+                        stream.id = "";
+                    }
+                }
                 getStream(connection.channel.id, stream.id).then((stream2) => {
+                    console.log(stream2)
                     if (stream2.stream) {
                         if ((Child == "") || (Child == undefined)) {
                             let lcmessages = stream.messages;
@@ -1153,19 +1160,27 @@ async function checkLiveChannels() {
                                 console.log(err);
                             })
                         } else {
-                            if (!already) {
-                                redoThing(true);
-                            } else {
-                                if (stream.live) {
-                                    console.log('stream ended')
-                                    stream.live = false;
-                                    db.overwriteOne('stream', stream);
-                                    if ((Child !== "") && (Child !== undefined)) {
-                                        Child.kill();
-                                        Child = "";
-                                    }
-                                    redoThing(connection.channel.id, true);
-                                    checkLiveChannels();
+                            db.overwriteOne('stream', {
+                                id: stream2.stream.id,
+                                title: stream2.stream.title,
+                                thumbnail: 'https://i.ytimg.com/vi/' + stream2.stream.id + '/hqdefault.jpg',
+                                live: true,
+                                messages: stream.messages,
+                                viewers: stream2.stream.viewers,
+                                likes: stream2.stream.likes,
+                            });
+                        }
+                    } else {
+                        if (!already) {
+                            redoThing(true);
+                        } else {
+                            if (stream.live) {
+                                console.log('stream ended')
+                                stream.live = false;
+                                db.overwriteOne('stream', stream);
+                                if ((Child != "") && (Child != undefined)) {
+                                    Child.send('end');
+                                    Child = "";
                                 }
                             }
                         }
@@ -1396,7 +1411,7 @@ app.get('/settings/enable', async (req, res) => {
                     return stream == user.stream.id;
                 });
                 if (index != -1) {
-                    children[index].send("stop");
+                    children[index].send("end");
                 }
                 res.status(200).send({
                     success: true,
@@ -1870,12 +1885,6 @@ app.get('/:type/:min/:max', async (req, res) => {
 //removeDuplicateUsers();
 
 checkLiveChannels();
-
-setInterval(() => {
-    Child.kill()
-    Child = "";
-    checkLiveChannels();
-}, 1000 * 60 * 60);
 
 app.listen(8080, () => {
     console.log('Server started: http://localhost:8080');

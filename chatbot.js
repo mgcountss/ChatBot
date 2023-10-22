@@ -1,11 +1,16 @@
 import { Masterchat, stringify } from "masterchat";
 import fetch from 'node-fetch';
+import axios from "axios";
+import https from "https";
 import fs from 'fs';
 import db from './db.js';
 import { fork } from 'child_process';
 console.log('Starting chatbot...')
-
-const mc = await Masterchat.init(process.argv[3]);
+const axiosInstance = axios.create({
+    timeout: 10000,
+    httpsAgent: new https.Agent({ keepAlive: true }),
+});
+const mc = await Masterchat.init(process.argv[3], { axiosInstance });
 
 let webhook1;
 let webhook2;
@@ -26,6 +31,7 @@ let batch = {
     "commands": [],
     "active": false
 }
+let end = false;
 
 try {
     webhook1 = fs.readFileSync('./user/webhook1.txt', 'utf8');
@@ -59,8 +65,8 @@ process.on('message', (message) => {
         mc.timeout(id).catch((error) => {
             console.error(error);
         });
-    } else if (message.startsWith('stop')) {
-        process.exit();
+    } else if (message.startsWith('end')) {
+        end = true;
     }
 });
 
@@ -149,6 +155,9 @@ mc.on("actions", async (chats) => {
                             lastCalledMinutes = new Date().getMinutes();
                             await updateEverything();
                         }
+                    }
+                    if (end == true) {
+                        process.exit();
                     }
                 }
             });
