@@ -150,7 +150,7 @@ mc.on("actions", async (chats) => {
                         "active": false
                     }
                     if (new Date().getMinutes() !== lastCalledMinutes) {
-                        if ((new Date().getMinutes() % 5 == 0) || (new Date().getMinutes() % 5 == lastCalledMinutes + 1)) {
+                        if ((new Date().getMinutes() % 5 == 0) || ((new Date().getMinutes() % 5) == (lastCalledMinutes + 1)) && (lastCalledMinutes !== new Date().getMinutes()-1) && (lastCalledMinutes !== new Date().getMinutes()+1)) {
                             console.log("Updating everything");
                             lastCalledMinutes = new Date().getMinutes();
                             await updateEverything();
@@ -168,7 +168,7 @@ mc.on("actions", async (chats) => {
 
 setInterval(async () => {
     if (new Date().getMinutes() !== lastCalledMinutes) {
-        if ((new Date().getMinutes() % 5 == 0) || (new Date().getMinutes() % 5 == lastCalledMinutes + 1)) {
+        if ((new Date().getMinutes() % 5 == 0) || ((new Date().getMinutes() % 5) == (lastCalledMinutes + 1)) && (lastCalledMinutes !== new Date().getMinutes()-1) && (lastCalledMinutes !== new Date().getMinutes()+1)) {
             console.log("Updating everything");
             lastCalledMinutes = new Date().getMinutes();
             await updateEverything();

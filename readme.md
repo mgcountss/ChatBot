@@ -1,5 +1,7 @@
 # MGBot
 ### This is the same chatbot I use in my 24/7 <a href="https://youtube.com/@sfmg/live">live stream</a>!
+
+## The setup guide below is outdated, I will update it soon though!
 ## How To Setup!
 To run the program, make sure you have <a href="https://nodejs.org">Node.js</a> v18.15.0 or higher.
 Next download the files and navigate to them within your command prompt/terminal. 
