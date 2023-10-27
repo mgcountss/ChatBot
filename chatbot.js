@@ -7,14 +7,7 @@ import db from './db.js';
 import { fork } from 'child_process';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from "puppeteer-extra-plugin-stealth"
-//npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth
 puppeteer.use(StealthPlugin())
-
-function delay(time) {
-    return new Promise(function (resolve) {
-        setTimeout(resolve, time)
-    });
-}
 
 console.log('Starting chatbot...')
 const axiosInstance = axios.create({
@@ -55,9 +48,6 @@ try {
     webhook3 = webhook3.replace('https://discord.com/api/webhooks/', 'https://discord.com/api/v10/webhooks/');
     webhook3 = webhook3 + "?wait=true"
 } catch (err) { }
-
-console.log('Chatbot started')
-console.log("Connection Started");
 
 process.on('message', (message) => {
     if (message.startsWith('ban___')) {
@@ -103,7 +93,7 @@ mc.on("actions", async (chats) => {
         batch.active = true;
         let index = 0;
         if (chats.length > 0) {
-            console.log("Received " + chats.length + " messages");
+            //console.log("Received " + chats.length + " messages");
         }
         for (const chat of chats) {
             index++;
@@ -132,7 +122,7 @@ mc.on("actions", async (chats) => {
             }
             await part1().then(async () => {
                 if (index == chats.length) {
-                    console.log("overwriting");
+                    //console.log("overwriting");
                     await db.overwriteOne('ids', batch.ids);
                     await db.overwriteOne('messages', batch.messages);
                     await db.overwriteOne('users', batch.users);
@@ -1156,37 +1146,8 @@ async function variableCheck(response, msg, cmd) {
                 }
             }
         }
-        console.log(response)
+        //console.log(response)
         return await sendMSG(response);
-    }
-}
-
-async function sendMSG(message) {
-    if (message) {
-        if (message.length > 0) {
-            if (message == "") {
-                return;
-            }
-            if (message.length > 200) {
-                let messages = [];
-                while (message.length > 200) {
-                    messages.push(message.substring(0, 200));
-                    message = message.substring(200);
-                }
-                messages.push(message);
-                messages = messages.reverse();
-                for (let i = 0; i < messages.length; i++) {
-                    return realSendMSG(messages[i])
-                }
-            } else {
-                message = message.toString()
-                return realSendMSG(message)
-            }
-        } else {
-            return ""
-        }
-    } else {
-        return ""
     }
 }
 
@@ -1272,50 +1233,38 @@ setInterval(async () => {
         }
     }
 }, 1000)
-let page;
 
-async function realSendMSG(msg) {
-    await page.click('yt-live-chat-text-input-field-renderer')
-    await page.keyboard.type(msg)
-    await delay(500);
-    await page.keyboard.press('Enter')
-    return msg;
-}
+let sender = fork('sender.js', [process.argv[2], process.argv[3], process.argv[4]]);
 
-puppeteer.launch({ headless: true }).then(async browser => {
-    page = await browser.newPage()
-    await page.setExtraHTTPHeaders(JSON.parse(fs.readFileSync('./user/headers.json', 'utf8')));
-    let cookies = fs.readFileSync('./user/cookies.txt', 'utf8');
-    cookies = cookies.split('; ');
-    for (let i = 0; i < cookies.length; i++) {
-        if (!cookies[i].includes('Secure')) {
-            const cookie = cookies[i];
-            const name = cookie.split('=')[0];
-            const value = cookie.split('=')[1];
-            await page.setCookie({ name: name, value: value, domain: '.youtube.com' });
-        }
-    }
-    await page.setViewport({ width: 1000, height: 600 })
-    await page.setJavaScriptEnabled(true)
-    await page.goto('https://www.youtube.com/live_chat?is_popout=1&v=' + process.argv[3])
-    setInterval(async () => {
-        await page.close()
-        page = await browser.newPage()
-        await page.setExtraHTTPHeaders(JSON.parse(fs.readFileSync('./user/headers.json', 'utf8')));
-        let cookies = fs.readFileSync('./user/cookies.txt', 'utf8');
-        cookies = cookies.split('; ');
-        for (let i = 0; i < cookies.length; i++) {
-            if (!cookies[i].includes('Secure')) {
-                const cookie = cookies[i];
-                const name = cookie.split('=')[0];
-                const value = cookie.split('=')[1];
-                await page.setCookie({ name: name, value: value, domain: '.youtube.com' });
+async function sendMSG(message) {
+    if (message) {
+        if (message.length > 0) {
+            if (message == "") {
+                return;
             }
+            if (message.length > 200) {
+                let messages = [];
+                while (message.length > 200) {
+                    messages.push(message.substring(0, 200));
+                    message = message.substring(200);
+                }
+                messages.push(message);
+                //messages = messages.reverse();
+                for (let i = 0; i < messages.length; i++) {
+                    sender.send(messages[i]);
+                }
+                return
+            } else {
+                message = message.toString()
+                sender.send(message);
+                return
+            }
+        } else {
+            return ""
         }
-        await page.setViewport({ width: 1000, height: 600 })
-        await page.setJavaScriptEnabled(true)
-        await page.goto('https://www.youtube.com/live_chat?is_popout=1&v=' + process.argv[3])
-    }, 3600000);
-})
+    } else {
+        return ""
+    }
+}
 
 mc.listen();

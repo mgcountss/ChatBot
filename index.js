@@ -73,7 +73,7 @@ async function getStream(id, id2) {
 }
 
 const logRoute = (req, res) => {
-    console.log(req.method + ' ' + req.url, req['ip']);
+    //console.log(req.method + ' ' + req.url, req['ip']);
 }
 
 app.get('/', async (req, res) => {
@@ -1535,6 +1535,7 @@ app.get('/public/live/chat/:id', async (req, res) => {
     }
 });
 
+let currency;
 app.get('/public/currency', async (req, res) => {
     logRoute(req, res)
     res.render(__dirname + '/web/public.ejs');
@@ -1545,9 +1546,9 @@ app.get('/public/currency/user', async (req, res) => {
     try {
         let dir = './user/db/users.json';
         if (fs.existsSync(dir)) {
-            let currency = JSON.parse(fs.readFileSync(dir));
             if (req.query.id) {
-                let user = currency.find(x => x.id == req.query.id);
+                let users = JSON.parse(fs.readFileSync(dir));
+                let user = users.find(x => x.id == req.query.id);
                 let dailyKeys = Object.keys(user.dailyStats);
                 try {
                     user.daily = {
@@ -1698,87 +1699,77 @@ app.post('/public/currency', async (req, res) => {
     let t = new Date();
     logRoute(req, res)
     try {
-        let dir = './user/db/users.json';
-        if (fs.existsSync(dir)) {
-            let currency = JSON.parse(fs.readFileSync(dir));
-            if (req.query.uid) {
-                let user = currency.find(x => x.id == req.query.uid);
-                if (user) {
-                    delete user.dailyStats;
-                    delete user.hourlyStats;
-                    delete user.warns;
-                    delete user.allWarns;
-                    delete user.cooldown;
-                    res.status(200).send({
-                        success: true,
-                        user: user
-                    });
-                } else {
-                    res.status(400).send({
-                        error: 'User not found',
-                        success: false
-                    });
-                }
-            } else {
-                if (!req.query.search) {
-                    req.query.search = '';
-                }
-                currency = JSON.parse(fs.readFileSync('./user/publicCurrencyCache.json'));
-                let total = currency.length;
-                let users = currency.filter((user) => {
-                    return (user.name.toLowerCase().includes(req.query.search.toLowerCase())) || (user.id.toLowerCase().includes(req.query.search.toLowerCase()));
+        if (req.query.uid) {
+            let user = [...currency].find(x => x.id == req.query.uid);
+            if (user) {
+                delete user.dailyStats;
+                delete user.hourlyStats;
+                delete user.warns;
+                delete user.allWarns;
+                delete user.cooldown;
+                res.status(200).send({
+                    success: true,
+                    user: user
                 });
-                let limit = req.query.limit;
-                let offset = req.query.offset;
-                if (limit && offset) {
-                    limit = parseInt(limit);
-                    offset = parseInt(offset);
-                    if (req.query.sort) {
-                        if ((req.query.sort == 'dailyPoints') || (req.query.sort == 'dailyMessages') || (req.query.sort == 'dailyXP') || (req.query.sort == 'weeklyPoints') || (req.query.sort == 'weeklyMessages') || (req.query.sort == 'weeklyXP') || (req.query.sort == 'monthlyPoints') || (req.query.sort == 'monthlyMessages') || (req.query.sort == 'monthlyXP')) {
-                            if (req.query.sort.includes('Points')) {
-                                req.query.sort = req.query.sort.replace('Points', '');
-                                users = users.sort((a, b) => {
-                                    return parseFloat(b[req.query.sort].points) - parseFloat(a[req.query.sort].points);
-                                });
-                            } else if (req.query.sort.includes('Messages')) {
-                                req.query.sort = req.query.sort.replace('Messages', '');
-                                users = users.sort((a, b) => {
-                                    return parseFloat(b[req.query.sort].messages) - parseFloat(a[req.query.sort].messages);
-                                });
-                            } else if (req.query.sort.includes('XP')) {
-                                req.query.sort = req.query.sort.replace('XP', '');
-                                users = users.sort((a, b) => {
-                                    return parseFloat(b[req.query.sort].xp) - parseFloat(a[req.query.sort].xp);
-                                });
-                            }
-                        } else {
-                            users = users.sort((a, b) => {
-                                return parseFloat(b[req.query.sort]) - parseFloat(a[req.query.sort]);
-                            });
-                        }
-                        if (req.query.order == 'asc') {
-                            users = users.reverse();
-                        }
-                    }
-                    users = users.slice(offset, offset + limit);
-                    res.status(200).send({
-                        success: true,
-                        users: users,
-                        total: total
-                    });
-                    console.log(new Date() - t);
-                } else {
-                    res.status(400).send({
-                        error: 'Missing limit or offset',
-                        success: false
-                    });
-                }
+            } else {
+                res.status(400).send({
+                    error: 'User not found',
+                    success: false
+                });
             }
         } else {
-            res.status(400).send({
-                error: 'Invalid ID or File not found',
-                success: false
+            if (!req.query.search) {
+                req.query.search = '';
+            }
+            let total = currency.length;
+            let users = [...currency].filter((user) => {
+                return (user.name.toLowerCase().includes(req.query.search.toLowerCase())) || (user.id.toLowerCase().includes(req.query.search.toLowerCase()));
             });
+            let limit = req.query.limit;
+            let offset = req.query.offset;
+            if (limit && offset) {
+                limit = parseInt(limit);
+                offset = parseInt(offset);
+                if (req.query.sort) {
+                    if ((req.query.sort == 'dailyPoints') || (req.query.sort == 'dailyMessages') || (req.query.sort == 'dailyXP') || (req.query.sort == 'weeklyPoints') || (req.query.sort == 'weeklyMessages') || (req.query.sort == 'weeklyXP') || (req.query.sort == 'monthlyPoints') || (req.query.sort == 'monthlyMessages') || (req.query.sort == 'monthlyXP')) {
+                        if (req.query.sort.includes('Points')) {
+                            req.query.sort = req.query.sort.replace('Points', '');
+                            users = users.sort((a, b) => {
+                                return parseFloat(b[req.query.sort].points) - parseFloat(a[req.query.sort].points);
+                            });
+                        } else if (req.query.sort.includes('Messages')) {
+                            req.query.sort = req.query.sort.replace('Messages', '');
+                            users = users.sort((a, b) => {
+                                return parseFloat(b[req.query.sort].messages) - parseFloat(a[req.query.sort].messages);
+                            });
+                        } else if (req.query.sort.includes('XP')) {
+                            req.query.sort = req.query.sort.replace('XP', '');
+                            users = users.sort((a, b) => {
+                                return parseFloat(b[req.query.sort].xp) - parseFloat(a[req.query.sort].xp);
+                            });
+                        }
+                    } else {
+                        users = users.sort((a, b) => {
+                            return parseFloat(b[req.query.sort]) - parseFloat(a[req.query.sort]);
+                        });
+                    }
+                    if (req.query.order == 'asc') {
+                        users = users.reverse();
+                    }
+                }
+                users = users.slice(offset, offset + limit);
+                res.status(200).send({
+                    success: true,
+                    users: users,
+                    total: total
+                });
+                console.log(new Date() - t);
+            } else {
+                res.status(400).send({
+                    error: 'Missing limit or offset',
+                    success: false
+                });
+            }
         }
     } catch (err) {
         console.log(err);
@@ -1803,6 +1794,7 @@ async function cachePublic() {
         delete users[i].allWarns;
         delete users[i].cooldown;
     }
+    currency = users;
     fs.writeFileSync('./user/publicCurrencyCache.json', JSON.stringify(users));
 }
 cachePublic();
