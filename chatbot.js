@@ -5,6 +5,17 @@ import https from "https";
 import fs from 'fs';
 import db from './db.js';
 import { fork } from 'child_process';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from "puppeteer-extra-plugin-stealth"
+//npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth
+puppeteer.use(StealthPlugin())
+
+function delay(time) {
+    return new Promise(function (resolve) {
+        setTimeout(resolve, time)
+    });
+}
+
 console.log('Starting chatbot...')
 const axiosInstance = axios.create({
     timeout: 10000,
@@ -150,7 +161,7 @@ mc.on("actions", async (chats) => {
                         "active": false
                     }
                     if (new Date().getMinutes() !== lastCalledMinutes) {
-                        if ((new Date().getMinutes() % 5 == 0) || ((new Date().getMinutes() % 5) == (lastCalledMinutes + 1)) && (lastCalledMinutes !== new Date().getMinutes()-1) && (lastCalledMinutes !== new Date().getMinutes()+1)) {
+                        if ((new Date().getMinutes() % 5 == 0) || ((new Date().getMinutes() % 5) == (lastCalledMinutes + 1)) && (lastCalledMinutes !== new Date().getMinutes() - 1) && (lastCalledMinutes !== new Date().getMinutes() + 1)) {
                             console.log("Updating everything");
                             lastCalledMinutes = new Date().getMinutes();
                             await updateEverything();
@@ -166,9 +177,23 @@ mc.on("actions", async (chats) => {
     first = false;
 });
 
+mc.on("error", (err) => {
+    end = true;
+    setTimeout(() => {
+        process.exit();
+    }, 15000);
+});
+
+mc.on("end", () => {
+    end = true;
+    setTimeout(() => {
+        process.exit();
+    }, 15000);
+})
+
 setInterval(async () => {
     if (new Date().getMinutes() !== lastCalledMinutes) {
-        if ((new Date().getMinutes() % 5 == 0) || ((new Date().getMinutes() % 5) == (lastCalledMinutes + 1)) && (lastCalledMinutes !== new Date().getMinutes()-1) && (lastCalledMinutes !== new Date().getMinutes()+1)) {
+        if ((new Date().getMinutes() % 5 == 0) || ((new Date().getMinutes() % 5) == (lastCalledMinutes + 1)) && (lastCalledMinutes !== new Date().getMinutes() - 1) && (lastCalledMinutes !== new Date().getMinutes() + 1)) {
             console.log("Updating everything");
             lastCalledMinutes = new Date().getMinutes();
             await updateEverything();
@@ -1247,78 +1272,50 @@ setInterval(async () => {
         }
     }
 }, 1000)
+let page;
 
-async function realSendMSG(message) {
-    //mc.sendMessage(queue[0]).catch((error) => {
-    //    console.error(error);
-    //});
-    message = message.replace(/@/g, '?');
-    if (webhook1) {
-        await fetch(webhook1, {
-            "headers": {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                "content": message,
-                "username": 'MGBot',
-                "avatar_url": 'https://yt3.ggpht.com/ytc/APkrFKZ_nZxOw4SKxqOEyano724_1pVxaiWXeGd1fw9caNy8bkouJC6--xQcXWPbIT8V=s800-c-k-c0x00ffffff-no-rj'
-            }),
-            "method": "POST",
-            "mode": "cors"
-        }).then(async (res) => {
-            if (batch.active) {
-                batch.messages.push({
-                    "type": "addChatItemAction",
-                    "id": Math.random().toString(36),
-                    "timestamp": null,
-                    "timestampUsec": new Date().getTime() * 1000,
-                    "authorName": "MGBot",
-                    "authorChannelId": process.argv[4],
-                    "authorPhoto": "https://yt3.ggpht.com/ytc/APkrFKZ_nZxOw4SKxqOEyano724_1pVxaiWXeGd1fw9caNy8bkouJC6--xQcXWPbIT8V=s800-c-k-c0x00ffffff-no-rj",
-                    "message": message,
-                    "isVerified": false,
-                    "isOwner": true,
-                    "isModerator": false,
-                    "contextMenuEndpointParams": null,
-                    "rawMessage": [
-                        {
-                            "text": message
-                        }
-                    ]
-                });
-                return "";
-            } else {
-                let messages = await db.getOne('messages');
-                messages.push({
-                    "type": "addChatItemAction",
-                    "id": Math.random().toString(36),
-                    "timestamp": null,
-                    "timestampUsec": new Date().getTime() * 1000,
-                    "authorName": "MGBot",
-                    "authorChannelId": process.argv[4],
-                    "authorPhoto": "https://yt3.ggpht.com/ytc/APkrFKZ_nZxOw4SKxqOEyano724_1pVxaiWXeGd1fw9caNy8bkouJC6--xQcXWPbIT8V=s800-c-k-c0x00ffffff-no-rj",
-                    "message": message,
-                    "isVerified": false,
-                    "isOwner": false,
-                    "isModerator": true,
-                    "contextMenuEndpointParams": null,
-                    "rawMessage": [
-                        {
-                            "text": message
-                        }
-                    ]
-                });
-                if (messages.length > 500) {
-                    messages.shift();
-                }
-                db.overwriteOne('messages', messages);
-            }
-        }).catch(err => {
-            console.log(err)
-        });
-    } else {
-        return "";
-    }
+async function realSendMSG(msg) {
+    await page.click('yt-live-chat-text-input-field-renderer')
+    await page.keyboard.type(msg)
+    await delay(500);
+    await page.keyboard.press('Enter')
+    return msg;
 }
+
+puppeteer.launch({ headless: true }).then(async browser => {
+    page = await browser.newPage()
+    await page.setExtraHTTPHeaders(JSON.parse(fs.readFileSync('./user/headers.json', 'utf8')));
+    let cookies = fs.readFileSync('./user/cookies.txt', 'utf8');
+    cookies = cookies.split('; ');
+    for (let i = 0; i < cookies.length; i++) {
+        if (!cookies[i].includes('Secure')) {
+            const cookie = cookies[i];
+            const name = cookie.split('=')[0];
+            const value = cookie.split('=')[1];
+            await page.setCookie({ name: name, value: value, domain: '.youtube.com' });
+        }
+    }
+    await page.setViewport({ width: 1000, height: 600 })
+    await page.setJavaScriptEnabled(true)
+    await page.goto('https://www.youtube.com/live_chat?is_popout=1&v=' + process.argv[3])
+    setInterval(async () => {
+        await page.close()
+        page = await browser.newPage()
+        await page.setExtraHTTPHeaders(JSON.parse(fs.readFileSync('./user/headers.json', 'utf8')));
+        let cookies = fs.readFileSync('./user/cookies.txt', 'utf8');
+        cookies = cookies.split('; ');
+        for (let i = 0; i < cookies.length; i++) {
+            if (!cookies[i].includes('Secure')) {
+                const cookie = cookies[i];
+                const name = cookie.split('=')[0];
+                const value = cookie.split('=')[1];
+                await page.setCookie({ name: name, value: value, domain: '.youtube.com' });
+            }
+        }
+        await page.setViewport({ width: 1000, height: 600 })
+        await page.setJavaScriptEnabled(true)
+        await page.goto('https://www.youtube.com/live_chat?is_popout=1&v=' + process.argv[3])
+    }, 3600000);
+})
 
 mc.listen();
