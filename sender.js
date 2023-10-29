@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from "puppeteer-extra-plugin-stealth"
 import fs from 'fs';
+import { set } from 'mongoose';
 puppeteer.use(StealthPlugin())
 let queue = [];
 process.on('message', (message) => {
@@ -45,7 +46,10 @@ setInterval(async () => {
     }
 }, 1000);
 
-puppeteer.launch({ headless: true, args: ['--no-sandbox'] }).then(async browser => {
+puppeteer.launch({ headless: false, args: ['--no-sandbox'] }).then(async browser => {
+    pageSetup(browser)
+})
+async function pageSetup(browser) {
     page = await browser.newPage()
     await page.setExtraHTTPHeaders(JSON.parse(fs.readFileSync('./user/headers.json', 'utf8')));
     let cookies = fs.readFileSync('./user/cookies.txt', 'utf8');
@@ -77,4 +81,8 @@ puppeteer.launch({ headless: true, args: ['--no-sandbox'] }).then(async browser 
             }
         }
     });
-})
+    setTimeout(async () => {
+        await page.close();
+        pageSetup(browser)
+    }, 1000 * 60 * 60);
+}
