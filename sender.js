@@ -46,7 +46,7 @@ setInterval(async () => {
     }
 }, 1000);
 
-puppeteer.launch({ headless: false, args: ['--no-sandbox'] }).then(async browser => {
+puppeteer.launch({ headless: true, args: ['--no-sandbox'] }).then(async browser => {
     pageSetup(browser)
 })
 async function pageSetup(browser) {
