@@ -46,7 +46,7 @@ setInterval(async () => {
     }
 }, 1000);
 
-puppeteer.launch({ headless: true, args: ['--no-sandbox'] }).then(async browser => {
+puppeteer.launch({ headless: false, args: ['--no-sandbox'] }).then(async browser => {
     pageSetup(browser)
 })
 async function pageSetup(browser) {
@@ -74,10 +74,20 @@ async function pageSetup(browser) {
             if (data.richMessage.textSegments[0].text == currentMSGThing.message) {
                 currentMSGThing.sent = true;
                 request.continue({ postData: JSON.stringify(data) });
+                const cookies = await page.cookies();
+                fs.writeFileSync('./user/cookies.txt', '', 'utf8');
+                for (let i = 0; i < cookies.length; i++) {
+                    fs.appendFileSync('./user/cookies.txt', cookies[i].name + '=' + cookies[i].value + '; ', 'utf8');
+                }
             } else {
                 data.richMessage.textSegments[0].text = currentMSGThing.message;
                 request.continue({ postData: JSON.stringify(data) });
                 currentMSGThing.sent = true;
+                const cookies = await page.cookies();
+                fs.writeFileSync('./user/cookies.txt', '', 'utf8');
+                for (let i = 0; i < cookies.length; i++) {
+                    fs.appendFileSync('./user/cookies.txt', cookies[i].name + '=' + cookies[i].value + '; ', 'utf8');
+                }
             }
         }
     });

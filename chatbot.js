@@ -8,6 +8,7 @@ import { fork } from 'child_process';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from "puppeteer-extra-plugin-stealth"
 puppeteer.use(StealthPlugin())
+let sender = fork('sender.js', [process.argv[2], process.argv[3], process.argv[4]]);
 
 console.log('Starting chatbot...')
 const axiosInstance = axios.create({
@@ -36,6 +37,7 @@ let batch = {
     "active": false
 }
 let end = false;
+let addToBatch = [];
 
 try {
     webhook1 = fs.readFileSync('./user/webhook1.txt', 'utf8');
@@ -68,6 +70,46 @@ process.on('message', (message) => {
         });
     } else if (message.startsWith('end')) {
         end = true;
+    } else if (message.startsWith('update')) {
+        if (message.startsWith('updateAddCommand')) {
+            if (batch.active) {
+                batch.commands.push(JSON.parse(message.split('updateAddCommand')[1]));
+            } else {
+                addToBatch.push({
+                    "type": "updateAddCommand",
+                    "data": JSON.parse(message.split('updateAddCommand')[1])
+                })
+            }
+        } else if (message.startsWith('updateRemoveCommand')) {
+            if (batch.active) {
+                batch.commands = batch.commands.filter((cmd) => cmd.id != message.split('updateRemoveCommand')[1]);
+            } else {
+                addToBatch.push({
+                    "type": "updateRemoveCommand",
+                    "data": message.split('updateRemoveCommand')[1]
+                })
+            }
+        } else if (message.startsWith('updateEditCommand')) {
+            if (batch.active) {
+                let u;
+                for (let i = 0; i < batch.commands.length; i++) {
+                    if (batch.commands[i].id == message.split('updateEditCommand')[1].split('___')[0]) {
+                        u = batch.commands[i];
+                        u.response = JSON.parse(message.split('updateEditCommand')[1].split('___')[1]).response;
+                    }
+                }
+                for (let i = 0; i < batch.commands.length; i++) {
+                    if (batch.commands[i].id == u.id) {
+                        batch.commands[i] = u;
+                    }
+                }
+            } else {
+                addToBatch.push({
+                    "type": "updateEditCommand",
+                    "data": message.split('updateEditCommand')[1]
+                })
+            }
+        }
     }
 });
 
@@ -158,6 +200,7 @@ mc.on("actions", async (chats) => {
                         }
                     }
                     if (end == true) {
+                        sender.kill();
                         process.exit();
                     }
                 }
@@ -1233,8 +1276,6 @@ setInterval(async () => {
         }
     }
 }, 1000)
-
-let sender = fork('sender.js', [process.argv[2], process.argv[3], process.argv[4]]);
 
 async function sendMSG(message) {
     if (message) {

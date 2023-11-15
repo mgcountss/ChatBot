@@ -239,13 +239,13 @@ app.post('/removeUser', async (req, res) => {
 app.post('/checkforstream', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
-            checkLiveChannels()
+        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+        if (userID) {
+            endStream()
+            res.send({ success: true })
         } else {
             res.send('Error')
         }
-    } else {
-        res.send('Unauthorized')
     }
 });
 
@@ -395,7 +395,7 @@ app.post('/addCommand', async (req, res) => {
                         }
                     }
                 }
-                db.addObject('commands', {
+                let cmd = {
                     command: req.body.name,
                     response: req.body.response,
                     permission: req.body.rank,
@@ -403,7 +403,12 @@ app.post('/addCommand', async (req, res) => {
                     default: false,
                     used: 0,
                     id: randomStr8
-                });
+                };
+                if ((Child != undefined) && (Child != "")) {
+                    Child.send('updateAddCommand' + JSON.stringify(cmd));
+                } else {
+                    db.addObject('commands', cmd);
+                }
                 res.status(200).send({
                     success: true
                 });
@@ -594,7 +599,11 @@ app.post('/removeCommand', async (req, res) => {
             if (req.body.name) {
                 for (let i = 0; i < commands.length; i++) {
                     if (commands[i].command == req.body.name) {
-                        db.removeObject('commands', 'id', commands[i].id);
+                        if ((Child != undefined) && (Child != "")) {
+                            Child.send('updateRemoveCommand' + commands[i].id);
+                        } else {
+                            db.removeObject('commands', 'id', commands[i].id);
+                        }
                         res.status(200).send({
                             success: true
                         });
@@ -640,7 +649,7 @@ app.post('/editCommand', async (req, res) => {
                 }
                 for (let i = 0; i < commands.length; i++) {
                     if (commands[i].command == req.body.name) {
-                        db.overwriteObjectInArray('commands', 'id', commands[i].id, {
+                        let cmd = {
                             command: req.body.name,
                             response: req.body.response,
                             permission: req.body.rank,
@@ -648,7 +657,12 @@ app.post('/editCommand', async (req, res) => {
                             default: false,
                             used: (parseFloat(commands[i].used) + 1),
                             id: commands[i].id
-                        });
+                        }
+                        if ((Child != undefined) && (Child != "")) {
+                            Child.send('updateEditCommand' + commands[i].id + "___" + JSON.stringify(cmd));
+                        } else {
+                            db.overwriteObjectInArray('commands', 'id', commands[i].id, cmd);
+                        }
                         res.status(200).send({
                             success: true
                         });
@@ -663,15 +677,19 @@ app.post('/editCommand', async (req, res) => {
                 if (req.body.id && req.body.used) {
                     for (let i = 0; i < commands.length; i++) {
                         if (commands[i].id == req.body.id) {
-                            db.overwriteObjectInArray('commands', 'id', commands[i].id, {
-                                command: commands[i].command,
+                            let cmd = {
                                 response: commands[i].response,
                                 permission: commands[i].permission,
                                 cooldown: commands[i].cooldown,
                                 default: commands[i].default,
                                 used: parseFloat(req.body.used),
                                 id: commands[i].id
-                            });
+                            };
+                            if ((Child != undefined) && (Child != "")) {
+                                Child.send('updateEditCommand' + commands[i].id + "___" + JSON.stringify(cmd));
+                            } else {
+                                db.overwriteObjectInArray('commands', 'id', commands[i].id, cmd);
+                            }
                             res.status(200).send({
                                 success: true
                             });
@@ -1407,11 +1425,9 @@ app.get('/settings/enable', async (req, res) => {
             } else {
                 settings.chatbot.enabled = false;
                 db.overwriteOne('settings', settings);
-                let index = livechats.findIndex((stream) => {
-                    return stream == user.stream.id;
-                });
-                if (index != -1) {
-                    children[index].send("end");
+                if ((Child != undefined) && (Child != "")) {
+                    Child.send('end');
+                    Child = "";
                 }
                 res.status(200).send({
                     success: true,
@@ -1812,71 +1828,96 @@ app.get('/:type/:min/:max', async (req, res) => {
             }
         }
     }
-    let users = await db.getOne('users')
-    if (users) {
-        let things = [...users];
-        if (things) {
-            if (sort == "verified") {
-                sort = "isVerified"
-            } else if (sort == "moderator") {
-                sort = "isModerator"
-            } else if (sort == "owner") {
-                sort = "isOwner"
-            } else if (sort == "lastmsg") {
-                sort = "lastMSG"
-            }
-            if (sort == "points" || sort == "messages" || sort == "hours" || sort == "lastMSG" || sort == "xp") {
-                if (sort == "lastMSG") {
-                    things.sort((a, b) => {
-                        return parseFloat(b["lastMSG"]) - parseFloat(a["lastMSG"])
-                    });
-                } else {
-                    things.sort((a, b) => {
-                        return parseFloat(b[sort]) - parseFloat(a[sort])
-                    });
+    if ((req.params.type == "users") || (req.params.type == "gain")) {
+        let users = await db.getOne('users')
+        if (users) {
+            let things = [...users];
+            if (things) {
+                if (sort == "verified") {
+                    sort = "isVerified"
+                } else if (sort == "moderator") {
+                    sort = "isModerator"
+                } else if (sort == "owner") {
+                    sort = "isOwner"
+                } else if (sort == "lastmsg") {
+                    sort = "lastMSG"
                 }
-            } else if (sort == "isVerified" || sort == "isModerator" || sort == "isOwner") {
-                things.sort((a, b) => {
-                    return b[sort] - a[sort]
-                })
-            }
-            if (sort == "gain") {
-                for (let i = 0; i < things.length; i++) {
-                    let gain = things[i][req.query.sortType];
-                    if (Object.keys(things[i].dailyStats).length > parseFloat(req.query.sortTime)) {
-                        let keys = Object.keys(things[i].dailyStats);
-                        gain = parseFloat(things[i].dailyStats[keys[keys.length - 1]][req.query.sortType]) - parseFloat(things[i].dailyStats[keys[keys.length - (parseFloat(req.query.sortTime) + 1)]][req.query.sortType])
-                        things[i].gain = gain;
-                        if ((new Date() * 1000) - parseFloat(things[i].lastMSG) > (parseFloat(req.query.sortTime) * 86400000000)) {
-                            things[i].gain = 0;
-                        }
+                if (sort == "points" || sort == "messages" || sort == "hours" || sort == "lastMSG" || sort == "xp") {
+                    if (sort == "lastMSG") {
+                        things.sort((a, b) => {
+                            return parseFloat(b["lastMSG"]) - parseFloat(a["lastMSG"])
+                        });
                     } else {
-                        things[i].gain = gain;
+                        things.sort((a, b) => {
+                            return parseFloat(b[sort]) - parseFloat(a[sort])
+                        });
+                    }
+                } else if (sort == "isVerified" || sort == "isModerator" || sort == "isOwner") {
+                    things.sort((a, b) => {
+                        return b[sort] - a[sort]
+                    })
+                }
+                if (sort == "gain") {
+                    for (let i = 0; i < things.length; i++) {
+                        let gain = things[i][req.query.sortType];
+                        if (Object.keys(things[i].dailyStats).length > parseFloat(req.query.sortTime)) {
+                            let keys = Object.keys(things[i].dailyStats);
+                            gain = parseFloat(things[i].dailyStats[keys[keys.length - 1]][req.query.sortType]) - parseFloat(things[i].dailyStats[keys[keys.length - (parseFloat(req.query.sortTime) + 1)]][req.query.sortType])
+                            things[i].gain = gain;
+                            if ((new Date() * 1000) - parseFloat(things[i].lastMSG) > (parseFloat(req.query.sortTime) * 86400000000)) {
+                                things[i].gain = 0;
+                            }
+                        } else {
+                            things[i].gain = gain;
+                        }
+                    }
+                    things.sort((a, b) => parseFloat(b['gain']) - parseFloat(a['gain']));
+                }
+                things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
+                if (!req.query.lol) {
+                    for (let i = 0; i < things.length; i++) {
+                        delete things[i].cooldown
+                        delete things[i].dailyStats
+                        delete things[i].hourlyStats
+                        things[i].warns = things[i].warnings ? things[i].warnings : []
+                        things[i].warnings = things[i].warnings ? things[i].warnings.length : 0
                     }
                 }
-                things.sort((a, b) => parseFloat(b['gain']) - parseFloat(a['gain']));
+                res.send(things)
+            } else {
+                res.send('Error')
             }
-            things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
-            if (!req.query.lol) {
-                for (let i = 0; i < things.length; i++) {
-                    delete things[i].cooldown
-                    delete things[i].dailyStats
-                    delete things[i].hourlyStats
-                    things[i].warns = things[i].warnings ? things[i].warnings : []
-                    things[i].warnings = things[i].warnings ? things[i].warnings.length : 0
-                }
-            }
-            res.send(things)
         } else {
             res.send('Error')
         }
-    } else {
-        res.send('Error')
+    } else if (req.params.type == "votes") {
+        let votes = await db.getOne('votes')
+        votes = votes.sort((a, b) => {
+            return parseFloat(b.votes) - parseFloat(a.votes)
+        });
+        if (votes) {
+            let things = [...votes];
+            if (things) {
+                things.sort((a, b) => {
+                    return parseFloat(b.count) - parseFloat(a.count)
+                });
+                things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
+                res.send(things)
+            } else {
+                res.send('Error')
+            }
+        } else {
+            res.send('Error')
+        }
     }
 });
 //removeDuplicateUsers();
 
 checkLiveChannels();
+
+function endStream() {
+    Child.send('end');
+}
 
 app.listen(8080, () => {
     console.log('Server started: http://localhost:8080');
