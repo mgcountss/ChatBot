@@ -5,9 +5,6 @@ import https from "https";
 import fs from 'fs';
 import db from './db.js';
 import { fork } from 'child_process';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from "puppeteer-extra-plugin-stealth"
-puppeteer.use(StealthPlugin())
 let sender = fork('sender.js', [process.argv[2], process.argv[3], process.argv[4]]);
 
 console.log('Starting chatbot...')
@@ -15,7 +12,7 @@ const axiosInstance = axios.create({
     timeout: 10000,
     httpsAgent: new https.Agent({ keepAlive: true }),
 });
-const mc = await Masterchat.init(process.argv[3], { axiosInstance });
+let mc = await Masterchat.init(process.argv[3], { axiosInstance });
 
 let webhook1;
 let webhook2;
@@ -118,6 +115,18 @@ let first = true;
 let lastCalledMinutes = new Date().getMinutes() - 1;
 
 mc.on("actions", async (chats) => {
+    await chatAction(chats);
+});
+
+mc.on("error", async (err) => {
+    mc = await Masterchat.init(process.argv[3], { axiosInstance });
+});
+
+mc.on("end", async () => {
+    mc = await Masterchat.init(process.argv[3], { axiosInstance });
+})
+
+async function chatAction(chats) {
     if (first == false) {
         chats = chats.sort((a, b) => a.timestampUsec - b.timestampUsec);
         batch.ids = await db.getOne('ids');
@@ -208,21 +217,7 @@ mc.on("actions", async (chats) => {
         }
     }
     first = false;
-});
-
-mc.on("error", (err) => {
-    end = true;
-    setTimeout(() => {
-        process.exit();
-    }, 15000);
-});
-
-mc.on("end", () => {
-    end = true;
-    setTimeout(() => {
-        process.exit();
-    }, 15000);
-})
+}
 
 setInterval(async () => {
     if (new Date().getMinutes() !== lastCalledMinutes) {
