@@ -5,14 +5,14 @@ import https from "https";
 import fs from 'fs';
 import db from './db.js';
 import { fork } from 'child_process';
-let sender = fork('sender.js', [process.argv[2], process.argv[3], process.argv[4]]);
+//let sender = fork('sender.js', [process.argv[2], process.argv[3], process.argv[4]]);
 
 console.log('Starting chatbot...')
 const axiosInstance = axios.create({
     timeout: 10000,
     httpsAgent: new https.Agent({ keepAlive: true }),
 });
-let mc = await Masterchat.init(process.argv[3], { axiosInstance });
+let mc = await Masterchat.init(process.argv[3], { axiosInstance, credentials: fs.readFileSync('./user/credentials.txt', 'utf8') });
 
 let webhook1;
 let webhook2;
@@ -119,11 +119,13 @@ mc.on("actions", async (chats) => {
 });
 
 mc.on("error", async (err) => {
-    mc = await Masterchat.init(process.argv[3], { axiosInstance });
+    end = true;
+    process.exit();
 });
 
 mc.on("end", async () => {
-    mc = await Masterchat.init(process.argv[3], { axiosInstance });
+    end = true;
+    process.exit();
 })
 
 async function chatAction(chats) {
@@ -209,7 +211,6 @@ async function chatAction(chats) {
                         }
                     }
                     if (end == true) {
-                        sender.kill();
                         process.exit();
                     }
                 }
@@ -487,7 +488,7 @@ async function logMessage(chat, start) {
                             if ((chat.message.includes('!vote ')) || (chat.message.includes('!wall'))) {
                                 add = 5;
                             }
-                            if ((stringify(chat.message).split(' ')[0].toLowerCase()) == ((commands[i].command.toLowerCase()))) {
+                            if ((stringify(chat.message).split(' ')[0].length > 1) && (stringify(chat.message).split(' ')[0].toLowerCase()) == ((commands[i].command.toLowerCase()))) {
                                 const userIndex = batch.users.findIndex(x => x.id === chat.authorChannelId);
                                 if (userIndex !== -1) {
                                     if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
@@ -1287,12 +1288,18 @@ async function sendMSG(message) {
                 messages.push(message);
                 //messages = messages.reverse();
                 for (let i = 0; i < messages.length; i++) {
-                    sender.send(messages[i]);
+                    mc.sendMessage(messages[i]).catch((error) => {
+                        console.log(error)
+                    })
+                    //sender.send(messages[i]);
                 }
                 return
             } else {
                 message = message.toString()
-                sender.send(message);
+                mc.sendMessage(message).catch((error) => {
+                    console.log(error)
+                })
+                //sender.send(message);
                 return
             }
         } else {

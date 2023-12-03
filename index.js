@@ -1155,9 +1155,6 @@ async function checkLiveChannels() {
                     if (stream2.stream) {
                         if ((Child == "") || (Child == undefined)) {
                             let lcmessages = stream.messages;
-                            if (stream.id != stream2.stream.id) {
-                                lcmessages = 0;
-                            }
                             db.overwriteOne('stream', {
                                 id: stream2.stream.id,
                                 title: stream2.stream.title,
