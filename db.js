@@ -34,7 +34,7 @@ const overwriteOne = async (type, value) => {
 const deleteFromArray = async (type, key, value) => {
   try {
     let json = JSON.parse(fs.readFileSync(`./user/db/${type}.json`, "utf8"));
-    json[key] = json[key].filter((item) => item !== value);
+    json = json.filter((item) => item[key] !== value);
     fs.writeFileSync(`./user/db/${type}.json`, JSON.stringify(json), "utf8");
   } catch (error) { }
 };

@@ -26,7 +26,6 @@ if (!fs.existsSync('./user')) {
 }
 
 async function getStream(id, id2) {
-    console.log(id, id2)
     try {
         let url = 'https://www.youtube.com/watch?v=' + id2;
         const { body } = await request(url);
@@ -1299,7 +1298,8 @@ app.post('/updateUser', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
         let users = await db.getOne('users');
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+        if (userID) {
             let subject = users.find(x => x.id == req.body.id);
             if (subject) {
                 if (req.body.type == 'warnings') {
@@ -1825,7 +1825,7 @@ app.get('/:type/:min/:max', async (req, res) => {
             }
         }
     }
-    if ((req.params.type == "users") || (req.params.type == "gain")) {
+    if ((req.params.type == "users") || (req.params.type == "gain") || (req.params.type == "points")) {
         let users = await db.getOne('users')
         if (users) {
             let things = [...users];
@@ -1913,7 +1913,11 @@ app.get('/:type/:min/:max', async (req, res) => {
 checkLiveChannels();
 
 function endStream() {
-    Child.send('end');
+    if ((Child != "") && (Child != undefined)) {
+        Child.send('end');
+        Child = "";
+    }
+    return true;
 }
 
 app.listen(8080, () => {
