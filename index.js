@@ -32,42 +32,39 @@ async function getStream(id, id2) {
         let bodyText = await body.text();
         let stream = bodyText.match(/(?<=hlsManifestUrl":").*\.m3u8/g);
         if (stream) {
-            return JSON.parse(`
-    {
-        "stream": {
-            "id": "${bodyText.split(`<link rel="canonical" href="https://www.youtube.com/watch?v=`)[1].split(`">`)[0]}",
-            "title": "${bodyText.split(`<title>`)[1].split(` - YouTube</title>`)[0]}",
-            "viewers": "${bodyText.split(`viewCount":{"runs":[{"text":"`)[1].split(`"`)[0]}",
-            "likes": "${bodyText.split(`{"accessibility":{"accessibilityData":{"label":"`)[1].split(` likes"}`)[0]}"
-        }
-    }`);
+            let id = bodyText.split(`<link rel="canonical" href="https://www.youtube.com/watch?v=`)[1].split(`">`)[0];
+            let title = bodyText.split(`<title>`)[1].split(` - YouTube</title>`)[0];
+            let viewers = bodyText.split(`viewCount":{"runs":[{"text":"`)[1].split(`"`)[0];
+            return {
+                "stream": {
+                    "id": id,
+                    "title": title,
+                    "viewers": viewers,
+                }
+            };
         } else {
             let url = 'https://www.youtube.com/channel/' + id + '/live';
             const { body } = await request(url);
             let bodyText = await body.text();
             let stream = bodyText.match(/(?<=hlsManifestUrl":").*\.m3u8/g);
             if (stream) {
-                return JSON.parse(`
-        {
-            "stream": {
-                "id": "${bodyText.split(`<link rel="canonical" href="https://www.youtube.com/watch?v=`)[1].split(`">`)[0]}",
-                "title": "${bodyText.split(`<title>`)[1].split(` - YouTube</title>`)[0]}",
-                "viewers": "${bodyText.split(`viewCount":{"runs":[{"text":"`)[1].split(`"`)[0]}",
-                "likes": "${bodyText.split(`{"accessibility":{"accessibilityData":{"label":"`)[1].split(` likes"}`)[0]}"
-            }
-        }`);
+                let id = bodyText.split(`<link rel="canonical" href="https://www.youtube.com/watch?v=`)[1].split(`">`)[0];
+                let title = bodyText.split(`<title>`)[1].split(` - YouTube</title>`)[0];
+                let viewers = bodyText.split(`viewCount":{"runs":[{"text":"`)[1].split(`"`)[0];
+                return {
+                    "stream": {
+                        "id": id,
+                        "title": title,
+                        "viewers": viewers,
+                    }
+                };
             } else {
-                return JSON.parse(`
-        {
-            "stream": null
-        }`);
+                return ({"stream": null});
             }
         }
     } catch (e) {
-        return JSON.parse(`
-    {
-        "stream": null
-    }`);
+        console.log(e)
+        return ({"stream": null});
     }
 }
 
@@ -85,6 +82,9 @@ app.get('/count', async (req, res) => {
     try {
         let counting = await db.getOne('counting')
         if (counting) {
+            if (!counting.messages) {
+                restoreLastBackup()
+            }
             if (counting.messages.length > 3) {
                 counting.messages = counting.messages.sort((a, b) => a.timestampUsec - b.timestampUsec)
                 counting.users = counting.users.sort((a, b) => a.count - b.count)
@@ -238,13 +238,19 @@ app.post('/removeUser', async (req, res) => {
 app.post('/checkforstream', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
+        console.log('has cookies')
         let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
         if (userID) {
+            console.log('is logged in')
             endStream()
             res.send({ success: true })
         } else {
             res.send('Error')
+            console.log('is not logged in')
         }
+    } else {
+        res.send('Error')
+        console.log('has no cookies')
     }
 });
 
@@ -316,6 +322,27 @@ app.get('/odometer.css', async (req, res) => {
     res.sendFile(__dirname + '/web/odometer.css');
 });
 
+function restoreLastBackup() {
+    let backups = fs.readdirSync('./user/archives');
+    backups.sort(function (a, b) {
+        return fs.statSync('./user/archives/' + b).mtime.getTime() - fs.statSync('./user/archives/' + a).mtime.getTime();
+    });
+    let file = fs.readFileSync('./user/archives/' + backups[0]);
+    let json = JSON.parse(file);
+    fs.writeFileSync('./user/db/commands.json', JSON.stringify(json.commands));
+    fs.writeFileSync('./user/db/connection.json', JSON.stringify(json.connection));
+    fs.writeFileSync('./user/db/counting.json', JSON.stringify(json.counting));
+    fs.writeFileSync('./user/db/giveaway.json', JSON.stringify(json.giveaway));
+    fs.writeFileSync('./user/db/ids.json', JSON.stringify(json.ids));
+    fs.writeFileSync('./user/db/messages.json', JSON.stringify(json.messages));
+    fs.writeFileSync('./user/db/moderation.json', JSON.stringify(json.moderation));
+    fs.writeFileSync('./user/db/settings.json', JSON.stringify(json.settings));
+    fs.writeFileSync('./user/db/stream.json', JSON.stringify(json.stream));
+    fs.writeFileSync('./user/db/timers.json', JSON.stringify(json.timers));
+    fs.writeFileSync('./user/db/users.json', JSON.stringify(json.users));
+    fs.writeFileSync('./user/db/votes.json', JSON.stringify(json.votes));
+}
+
 app.get('/dashboard', async (req, res) => {
     logRoute(req, res)
     let key = ""
@@ -327,6 +354,10 @@ app.get('/dashboard', async (req, res) => {
             res.redirect('/dashboard')
         }
     }
+    let settings = await db.getOne('settings')
+    if (settings == {}) {
+        restoreLastBackup()
+    }
     let userAuth = await db.findUserIdFromToken(req.cookies['chatbot']);
     let commands = await db.getOne('commands')
     let connection = await db.getOne('connection')
@@ -335,7 +366,6 @@ app.get('/dashboard', async (req, res) => {
     let messages = await db.getOne('messages')
     let moderation = await db.getOne('moderation')
     let quotes = await db.getOne('quotes')
-    let settings = await db.getOne('settings')
     let stream = await db.getOne('stream')
     let timers = await db.getOne('timers')
     let users = await db.getOne('users')
@@ -792,44 +822,53 @@ app.get('/restore', async (req, res) => {
 });
 
 app.post('/restore/:date', async (req, res) => {
-    logRoute(req, res)
-    if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        if (userID) {
-            let backups = fs.readdirSync('./user/archives');
-            if (backups.includes(req.params.date)) {
-                let a = false;
-                if ((Child != undefined) || (Child != "")) {
-                    Child.send('end');
-                    Child = "";
-                    a = true;
-                }
-                let file = fs.readFileSync('./user/archives/' + req.params.date);
-                let json = JSON.parse(file);
-                fs.writeFileSync('./user/db/commands.json', JSON.stringify(json.commands));
-                fs.writeFileSync('./user/db/connection.json', JSON.stringify(json.connection));
-                fs.writeFileSync('./user/db/counting.json', JSON.stringify(json.counting));
-                fs.writeFileSync('./user/db/giveaway.json', JSON.stringify(json.giveaway));
-                fs.writeFileSync('./user/db/ids.json', JSON.stringify(json.ids));
-                fs.writeFileSync('./user/db/messages.json', JSON.stringify(json.messages));
-                fs.writeFileSync('./user/db/moderation.json', JSON.stringify(json.moderation));
-                fs.writeFileSync('./user/db/settings.json', JSON.stringify(json.settings));
-                fs.writeFileSync('./user/db/stream.json', JSON.stringify(json.stream));
-                fs.writeFileSync('./user/db/timers.json', JSON.stringify(json.timers));
-                fs.writeFileSync('./user/db/users.json', JSON.stringify(json.users));
-                fs.writeFileSync('./user/db/votes.json', JSON.stringify(json.votes));
-                res.send({ success: true })
-                if (a) {
-                    checkLiveChannels()
+    try {
+        logRoute(req, res)
+        if (req.cookies['chatbot']) {
+            let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+            if (userID) {
+                let backups = fs.readdirSync('./user/archives');
+                if (backups.includes(req.params.date)) {
+                    let a = false;
+                    if ((Child != undefined) || (Child != "")) {
+                        try {
+                            Child.send('end');
+                            Child = "";
+                            a = true;
+                        } catch (e) {
+                            console.log(e)
+                        }
+                    }
+                    let file = fs.readFileSync('./user/archives/' + req.params.date);
+                    let json = JSON.parse(file);
+                    fs.writeFileSync('./user/db/commands.json', JSON.stringify(json.commands));
+                    fs.writeFileSync('./user/db/connection.json', JSON.stringify(json.connection));
+                    fs.writeFileSync('./user/db/counting.json', JSON.stringify(json.counting));
+                    fs.writeFileSync('./user/db/giveaway.json', JSON.stringify(json.giveaway));
+                    fs.writeFileSync('./user/db/ids.json', JSON.stringify(json.ids));
+                    fs.writeFileSync('./user/db/messages.json', JSON.stringify(json.messages));
+                    fs.writeFileSync('./user/db/moderation.json', JSON.stringify(json.moderation));
+                    fs.writeFileSync('./user/db/settings.json', JSON.stringify(json.settings));
+                    fs.writeFileSync('./user/db/stream.json', JSON.stringify(json.stream));
+                    fs.writeFileSync('./user/db/timers.json', JSON.stringify(json.timers));
+                    fs.writeFileSync('./user/db/users.json', JSON.stringify(json.users));
+                    fs.writeFileSync('./user/db/votes.json', JSON.stringify(json.votes));
+                    res.send({ success: true })
+                    if (a) {
+                        checkLiveChannels()
+                    }
+                } else {
+                    res.status(404).send({ error: 'Not found' })
                 }
             } else {
-                res.status(404).send({ error: 'Not found' })
+                res.status(401).send({ error: 'Unauthorized' })
             }
         } else {
             res.status(401).send({ error: 'Unauthorized' })
         }
-    } else {
-        res.status(401).send({ error: 'Unauthorized' })
+    } catch (e) {
+        console.log(e)
+        res.status(500).send({ error: 'Internal Server Error' })
     }
 });
 
@@ -915,8 +954,7 @@ app.post('/connect', async (req, res) => {
                     "thumbnail": "",
                     "live": false,
                     "messages": 0,
-                    "viewers": "",
-                    "likes": ""
+                    "viewers": ""
                 },
                 "commands": [
                     {
@@ -1160,8 +1198,7 @@ async function checkLiveChannels() {
                                 thumbnail: 'https://i.ytimg.com/vi/' + stream2.stream.id + '/hqdefault.jpg',
                                 live: true,
                                 messages: lcmessages,
-                                viewers: stream2.stream.viewers,
-                                likes: stream2.stream.likes,
+                                viewers: stream2.stream.viewers
                             });
                             Child = fork('chatbot.js', [connection.channel.id, stream2.stream.id, connection.bot.id]);
                             Child.send('Hello from the parent!');
@@ -1180,8 +1217,7 @@ async function checkLiveChannels() {
                                 thumbnail: 'https://i.ytimg.com/vi/' + stream2.stream.id + '/hqdefault.jpg',
                                 live: true,
                                 messages: stream.messages,
-                                viewers: stream2.stream.viewers,
-                                likes: stream2.stream.likes,
+                                viewers: stream2.stream.viewers
                             });
                         }
                     } else {
@@ -1554,6 +1590,171 @@ app.get('/public/currency', async (req, res) => {
     res.render(__dirname + '/web/public.ejs');
 });
 
+app.get('/public/compare/search', async (req, res) => {
+    logRoute(req, res)
+    res.sendFile(__dirname + '/web/compare.html');
+});
+
+app.get('/public/compare', async (req, res) => {
+    logRoute(req, res);
+    let user1 = req.query.id1;
+    let user2 = req.query.id2;
+    if (!user1 || !user2) {
+        res.status(400).send({
+            error: 'Missing user(s)',
+            success: false
+        });
+        return;
+    }
+    if (user1 == user2) {
+        res.status(400).send({
+            error: 'Cannot compare the same user',
+            success: false
+        });
+        return;
+    }
+    let users = JSON.parse(fs.readFileSync('./user/db/users.json'));
+    let user1Data = users.find(x => x.id == user1);
+    let user2Data = users.find(x => x.id == user2);
+    let dailyKeys1 = Object.keys(user1Data.dailyStats);
+    try {
+        user1Data.daily = {
+            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 2]].points),
+            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 2]].messages),
+            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 2]].xp)
+        }
+    } catch (err) {
+        user1Data.daily = {
+            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].points),
+            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].messages),
+            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].xp)
+        }
+    }
+    try {
+        user1Data.weekly = {
+            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 8]].points),
+            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 8]].messages),
+            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 8]].xp)
+        }
+    } catch (err) {
+        user1Data.weekly = {
+            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].points),
+            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].messages),
+            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].xp)
+        }
+    }
+    try {
+        user1Data.monthly = {
+            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 31]].points),
+            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 31]].messages),
+            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 31]].xp)
+        }
+    } catch (err) {
+        user1Data.monthly = {
+            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].points),
+            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].messages),
+            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].xp)
+        }
+    }
+    if (user1Data.lastMSG) {
+        if ((Date.now() * 1000) - (user1Data.lastMSG) > 86400000000) {
+            user1Data.daily = {
+                points: 0,
+                messages: 0,
+                xp: 0
+            }
+        }
+        if ((Date.now() * 1000) - (user1Data.lastMSG) > 604800000000000) {
+            user1Data.weekly = {
+                points: 0,
+                messages: 0,
+                xp: 0
+            }
+        }
+        if ((Date.now() * 1000) - (user1Data.lastMSG) > 2592000000000) {
+            user1Data.monthly = {
+                points: 0,
+                messages: 0,
+                xp: 0
+            }
+        }
+    }
+    let dailyKeys2 = Object.keys(user2Data.dailyStats);
+    try {
+        user2Data.daily = {
+            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 2]].points),
+            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 2]].messages),
+            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 2]].xp)
+        }
+    } catch (err) {
+        user2Data.daily = {
+            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].points),
+            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].messages),
+            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].xp)
+        }
+    }
+    try {
+        user2Data.weekly = {
+            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 8]].points),
+            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 8]].messages),
+            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 8]].xp)
+        }
+    } catch (err) {
+        user2Data.weekly = {
+            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].points),
+            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].messages),
+            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].xp)
+        }
+    }
+    try {
+        user2Data.monthly = {
+            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 31]].points),
+            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 31]].messages),
+            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 31]].xp)
+        }
+    } catch (err) {
+        user2Data.monthly = {
+            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].points),
+            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].messages),
+            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].xp)
+        }
+    }
+    if (user2Data.lastMSG) {
+        if ((Date.now() * 1000) - (user2Data.lastMSG) > 86400000000) {
+            user2Data.daily = {
+                points: 0,
+                messages: 0,
+                xp: 0
+            }
+        }
+        if ((Date.now() * 1000) - (user2Data.lastMSG) > 604800000000000) {
+            user2Data.weekly = {
+                points: 0,
+                messages: 0,
+                xp: 0
+            }
+        }
+        if ((Date.now() * 1000) - (user2Data.lastMSG) > 2592000000000) {
+            user2Data.monthly = {
+                points: 0,
+                messages: 0,
+                xp: 0
+            }
+        }
+    }
+    if (!user1Data || !user2Data) {
+        res.status(400).send({
+            error: 'User not found',
+            success: false
+        });
+        return;
+    }
+    res.render(__dirname + '/web/compare.ejs',{
+        user1: user1Data,
+        user2: user2Data
+    });
+});
+
 app.get('/public/currency/user', async (req, res) => {
     logRoute(req, res)
     try {
@@ -1654,6 +1855,11 @@ app.get('/public/currency/user', async (req, res) => {
             success: false
         });
     }
+});
+
+app.get('/favicon.ico', async (req, res) => {
+    logRoute(req, res)
+    res.sendFile(__dirname + '/web/favicon.ico');
 });
 
 function calculateDifference(dailyStats, key, daysAgo, currencyLength) {
@@ -1917,6 +2123,7 @@ function endStream() {
         Child.send('end');
         Child = "";
     }
+    checkLiveChannels();
     return true;
 }
 

@@ -1,4 +1,3 @@
-/*This is the file I use, after installing "npm install masterchat", replace the "masterchat.mjs" with this*/
 import axios from 'axios';
 import { AsyncIterator } from 'iterator-helpers-polyfill';
 import sha1 from 'sha1';
@@ -1047,7 +1046,7 @@ function delay(duration, signal) {
     });
 }
 function guessFreeChat(title) {
-    //return /(?:[fF]ree\s?[cC]hat|(?:ふりー|フリー)(?:ちゃっと|チャット))/.test(title);
+    return /(?:[fF]ree\s?[cC]hat|(?:ふりー|フリー)(?:ちゃっと|チャット))/.test(title);
 }
 function groupBy(lst, key) {
     return lst.reduce((result, o) => {
@@ -1269,7 +1268,7 @@ function parseAddBannerToLiveChatCommand(payload) {
         return payload;
     }
     else {
-
+        throw new Error(`[action required] Unrecognized content type found in parseAddBannerToLiveChatCommand: ${JSON.stringify(payload)}`);
     }
 }
 
@@ -1656,7 +1655,10 @@ function parseLiveChatSponsorshipsGiftPurchaseAnnouncementRenderer(renderer) {
     if (!authorName) {
         debugLog$1("[action required] empty authorName (gift purchase)", JSON.stringify(renderer));
     }
-    const membership = parseMembership(header.authorBadges[header.authorBadges.length - 1]);
+    let membership = null;
+    if (header.authorBadges) {
+        membership = parseMembership(header.authorBadges[header.authorBadges.length - 1]);
+    }
     if (!membership) {
         debugLog$1("[action required] empty membership (gift purchase)", JSON.stringify(renderer));
     }
@@ -2100,7 +2102,7 @@ function findPlayabilityStatus(data) {
 async function parseMetadataFromEmbed(html) {
     const epr = findEPR(html);
     const ps = epr.previewPlayabilityStatus;
-    //assertPlayability(ps);
+    assertPlayability(ps);
     const ep = epr.embedPreview;
     const prevRdr = ep.thumbnailPreviewRenderer;
     const vdRdr = prevRdr.videoDetails.embeddedPlayerOverlayVideoDetailsRenderer;
@@ -2125,7 +2127,7 @@ async function parseMetadataFromEmbed(html) {
 function parseMetadataFromWatch(html) {
     const initialData = findInitialData(html);
     const playabilityStatus = findPlayabilityStatus(html);
-    // assertPlayability(playabilityStatus);
+    assertPlayability(playabilityStatus);
     // TODO: initialData.contents.twoColumnWatchNextResults.conversationBar.conversationBarRenderer.availabilityMessage.messageRenderer.text.runs[0].text === 'Chat is disabled for this live stream.'
     const results = initialData.contents?.twoColumnWatchNextResults?.results.results;
     const primaryInfo = results.contents[0].videoPrimaryInfoRenderer;
@@ -2531,7 +2533,6 @@ class Masterchat extends events.exports.EventEmitter {
      * Private API
      */
     async postWithRetry(input, body, options) {
-        console.log(input, body.options)
         // this.log("postWithRetry", input);
         const errors = [];
         let remaining = options?.retry ?? 0;
@@ -2743,7 +2744,7 @@ class Masterchat extends events.exports.EventEmitter {
         this.axiosInstance =
             axiosInstance ??
             axios.create({
-                timeout: 30000,
+                timeout: 4000,
             });
         this.setCredentials(credentials);
     }
@@ -2918,7 +2919,7 @@ class Masterchat extends events.exports.EventEmitter {
                 const driftMs = Date.now() - startMs;
                 const timeoutMs = continuation.timeoutMs - driftMs;
                 if (timeoutMs > 500) {
-                    await delay(2500, signal);
+                    await delay(timeoutMs, signal);
                 }
             }
         }
@@ -3119,7 +3120,7 @@ class Masterchat extends events.exports.EventEmitter {
             params,
         }));
         if (!res.success) {
-            throw new Error(`Failed to pin chat: ` + JSON.stringify(res.data.error));
+            throw new Error(`Failed to pin chat: ` + JSON.stringify(res));
         }
         return res; // TODO
     }
@@ -3453,4 +3454,4 @@ class StreamPool extends events.exports.EventEmitter {
     }
 }
 
-export { AbortError, AccessDeniedError, B64Type, CommentActionButtonsRendererStyle, DisabledChatError, IconPosition, InvalidArgumentError, LiveChatMode, Masterchat, MasterchatError, MembersOnlyError, NoPermissionError, NoStreamRecordingError, RenderingPriority, SUPERCHAT_COLOR_MAP, SUPERCHAT_SIGNIFICANCE_MAP, SizeEnum, StreamPool, TextEnum, UnavailableError, VoteStatus, YTChatErrorStatus, addModeratorParams, b64d, b64e, b64tou8, bitou8, concatu8, csc, delay, durationToISO8601, durationToSeconds, endpointToUrl, formatColor, getContextMenuParams, getTranscriptParams, groupBy, hextou8, hideParams, liveReloadContinuation, liveTimedContinuation, parsePb, pinParams, pprintPbValue, printBuf, removeMessageParams, replayReloadContinuation, replayTimedContinuation, runsToString, sendMessageParams, stringify, timeoutParams, toJSON, toVideoId, transcriptFormatToken, tsToDate, tsToNumber, u8tob64, u8tobi, u8tohex, unpinParams };
+export { AbortError, AccessDeniedError, B64Type, CommentActionButtonsRendererStyle, DisabledChatError, IconPosition, InvalidArgumentError, LiveChatMode, Masterchat, MasterchatError, MembersOnlyError, NoPermissionError, NoStreamRecordingError, RenderingPriority, SUPERCHAT_COLOR_MAP, SUPERCHAT_SIGNIFICANCE_MAP, SizeEnum, StreamPool, TextEnum, UnavailableError, VoteStatus, YTChatErrorStatus, addModeratorParams, b64d, b64e, b64tou8, bitou8, concatu8, csc, delay, durationToISO8601, durationToSeconds, endpointToUrl, formatColor, getContextMenuParams, getTranscriptParams, groupBy, guessFreeChat, hextou8, hideParams, liveReloadContinuation, liveTimedContinuation, parsePb, pinParams, pprintPbValue, printBuf, removeMessageParams, replayReloadContinuation, replayTimedContinuation, runsToString, sendMessageParams, stringify, timeoutParams, toJSON, toVideoId, transcriptFormatToken, tsToDate, tsToNumber, u8tob64, u8tobi, u8tohex, unpinParams };

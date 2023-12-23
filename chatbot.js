@@ -120,6 +120,7 @@ mc.on("actions", async (chats) => {
 
 mc.on("error", async (err) => {
     end = true;
+    console.log(err);
     process.exit();
 });
 
@@ -1251,7 +1252,7 @@ async function updateEverything() {
             }
             let Child = fork('backup.js', [process.argv[2]]);
             Child.on('exit', (code) => {
-                console.log(`Child exited with code ${code}`);
+                console.log(`Points child exited with code ${code}`);
             });
         }
         console.log(`${new Date()}: ${pointGainers.length} users have gained 1 point (${pointGainers})`)
@@ -1286,12 +1287,10 @@ async function sendMSG(message) {
                     message = message.substring(200);
                 }
                 messages.push(message);
-                //messages = messages.reverse();
                 for (let i = 0; i < messages.length; i++) {
                     mc.sendMessage(messages[i]).catch((error) => {
                         console.log(error)
                     })
-                    //sender.send(messages[i]);
                 }
                 return
             } else {
@@ -1299,7 +1298,6 @@ async function sendMSG(message) {
                 mc.sendMessage(message).catch((error) => {
                     console.log(error)
                 })
-                //sender.send(message);
                 return
             }
         } else {
