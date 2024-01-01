@@ -27,7 +27,7 @@ if (!fs.existsSync('./user')) {
 
 async function getStream(id, id2) {
     try {
-        let url = 'https://www.youtube.com/watch?v=' + id2;
+        let url = 'https://www.youtube.com/watch?v=pnZ8bRsjSAs'// + id2;
         const { body } = await request(url);
         let bodyText = await body.text();
         let stream = bodyText.match(/(?<=hlsManifestUrl":").*\.m3u8/g);
@@ -43,7 +43,8 @@ async function getStream(id, id2) {
                 }
             };
         } else {
-            let url = 'https://www.youtube.com/channel/' + id + '/live';
+            //let url = 'https://www.youtube.com/channel/' + id + '/live';
+            let url = 'https://www.youtube.com/watch?v=pnZ8bRsjSAs'// + id2;
             const { body } = await request(url);
             let bodyText = await body.text();
             let stream = bodyText.match(/(?<=hlsManifestUrl":").*\.m3u8/g);
@@ -59,12 +60,12 @@ async function getStream(id, id2) {
                     }
                 };
             } else {
-                return ({"stream": null});
+                return ({ "stream": null });
             }
         }
     } catch (e) {
         console.log(e)
-        return ({"stream": null});
+        return ({ "stream": null });
     }
 }
 
@@ -84,6 +85,8 @@ app.get('/count', async (req, res) => {
         if (counting) {
             if (!counting.messages) {
                 restoreLastBackup()
+                res.send('Error');
+                return;
             }
             if (counting.messages.length > 3) {
                 counting.messages = counting.messages.sort((a, b) => a.timestampUsec - b.timestampUsec)
@@ -1749,7 +1752,7 @@ app.get('/public/compare', async (req, res) => {
         });
         return;
     }
-    res.render(__dirname + '/web/compare.ejs',{
+    res.render(__dirname + '/web/compare.ejs', {
         user1: user1Data,
         user2: user2Data
     });
@@ -1922,7 +1925,6 @@ app.post('/public/currency', async (req, res) => {
             let user = [...currency].find(x => x.id == req.query.uid);
             if (user) {
                 delete user.dailyStats;
-                delete user.hourlyStats;
                 delete user.warns;
                 delete user.allWarns;
                 delete user.cooldown;
@@ -1982,7 +1984,7 @@ app.post('/public/currency', async (req, res) => {
                     users: users,
                     total: total
                 });
-                console.log(new Date() - t);
+                //console.log(new Date() - t);
             } else {
                 res.status(400).send({
                     error: 'Missing limit or offset',

@@ -111,12 +111,24 @@ process.on('message', (message) => {
 });
 
 let preventDouble = [];
-let first = true;
 let lastCalledMinutes = new Date().getMinutes() - 1;
+let futureChats = [];
+let goingThroughMessages = false;
 
 mc.on("actions", async (chats) => {
-    await chatAction(chats);
+    if (chats.length > 0) {
+        for (const chat of chats) {
+            futureChats.push(chat);
+        }
+    }
 });
+
+setInterval(async () => {
+    if (goingThroughMessages == false) {
+        chatAction(futureChats);
+        futureChats = [];
+    }
+}, 10000);
 
 mc.on("error", async (err) => {
     end = true;
@@ -130,95 +142,94 @@ mc.on("end", async () => {
 })
 
 async function chatAction(chats) {
-    if (first == false) {
-        chats = chats.sort((a, b) => a.timestampUsec - b.timestampUsec);
-        batch.ids = await db.getOne('ids');
-        batch.messages = await db.getOne('messages');
-        batch.users = await db.getOne('users');
-        batch.moderation = await db.getOne('moderation');
-        batch.stream = await db.getOne('stream');
-        batch.giveaway = await db.getOne('giveaway');
-        batch.settings = await db.getOne('settings');
-        batch.counting = await db.getOne('counting');
-        batch.commands = await db.getOne('commands');
-        batch.votes = await db.getOne('votes');
-        batch.connection = await db.getOne('connection');
-        batch.commands = await db.getOne('commands');
-        batch.active = true;
-        let index = 0;
-        if (chats.length > 0) {
-            //console.log("Received " + chats.length + " messages");
-        }
-        for (const chat of chats) {
-            index++;
-            async function part1() {
-                if (!batch.ids.includes(chat.id)) {
-                    if (!preventDouble.includes(chat.id)) {
-                        preventDouble.push(chat.id);
-                        if (preventDouble.length > 100) {
-                            preventDouble.shift();
-                        }
-                        if (chat.type === 'addChatItemAction') {
-                            let a = new Date();
-                            return await logMessage(chat, a);
-                        } else if (chat.type === 'moderationMessageAction') {
-                            batch.ids.push(chat.id);
-                            if (chat.message) {
-                                const modifiedMessage = stringify(chat.message).replace(/@/g, '?');
-                                return await sendMessageToWebhook(webhook2, modifiedMessage);
-                            } else {
-                                const deletedMessage = 'Deleted message: ' + stringify(batch.messages.find(x => x.targetId === chat.id).rawMessage);
-                                return await sendMessageToWebhook(webhook2, deletedMessage);
-                            }
+    goingThroughMessages = true;
+    console.log("Received " + chats.length + " messages");
+    chats = chats.sort((a, b) => a.timestampUsec - b.timestampUsec);
+    batch.ids = await db.getOne('ids');
+    batch.messages = await db.getOne('messages');
+    batch.users = await db.getOne('users');
+    batch.moderation = await db.getOne('moderation');
+    batch.stream = await db.getOne('stream');
+    batch.giveaway = await db.getOne('giveaway');
+    batch.settings = await db.getOne('settings');
+    batch.counting = await db.getOne('counting');
+    batch.commands = await db.getOne('commands');
+    batch.votes = await db.getOne('votes');
+    batch.connection = await db.getOne('connection');
+    batch.commands = await db.getOne('commands');
+    batch.active = true;
+    let index = 0;
+    for (const chat of chats) {
+        index++;
+        console.log(index + "/" + chats.length+": "+stringify(chat.message));
+        async function part1() {
+            if (!batch.ids.includes(chat.id)) {
+                if (!preventDouble.includes(chat.id)) {
+                    preventDouble.push(chat.id);
+                    if (preventDouble.length > 100) {
+                        preventDouble.shift();
+                    }
+                    if (chat.type === 'addChatItemAction') {
+                        let a = new Date();
+                        return await logMessage(chat, a);
+                    } else if (chat.type === 'moderationMessageAction') {
+                        batch.ids.push(chat.id);
+                        if (chat.message) {
+                            const modifiedMessage = stringify(chat.message).replace(/@/g, '?');
+                            return await sendMessageToWebhook(webhook2, modifiedMessage);
+                        } else {
+                            const deletedMessage = 'Deleted message: ' + stringify(batch.messages.find(x => x.targetId === chat.id).rawMessage);
+                            return await sendMessageToWebhook(webhook2, deletedMessage);
                         }
                     }
                 }
             }
-            await part1().then(async () => {
-                if (index == chats.length) {
-                    //console.log("overwriting");
-                    await db.overwriteOne('ids', batch.ids);
-                    await db.overwriteOne('messages', batch.messages);
-                    await db.overwriteOne('users', batch.users);
-                    await db.overwriteOne('moderation', batch.moderation);
-                    await db.overwriteOne('stream', batch.stream);
-                    await db.overwriteOne('giveaway', batch.giveaway);
-                    await db.overwriteOne('settings', batch.settings);
-                    await db.overwriteOne('counting', batch.counting);
-                    await db.overwriteOne('commands', batch.commands);
-                    await db.overwriteOne('votes', batch.votes);
-                    await db.overwriteOne('connection', batch.connection);
-                    await db.overwriteOne('commands', batch.commands);
-                    batch = {
-                        "ids": [],
-                        "messages": [],
-                        "users": [],
-                        "moderation": {},
-                        "stream": {},
-                        "giveaway": {},
-                        "settings": {},
-                        "counting": {},
-                        "commands": [],
-                        "votes": [],
-                        "connection": {},
-                        "commands": [],
-                        "active": false
-                    }
-                    if (new Date().getMinutes() !== lastCalledMinutes) {
-                        if ((new Date().getMinutes() % 5 == 0) || ((new Date().getMinutes() % 5) == (lastCalledMinutes + 1)) && (lastCalledMinutes !== new Date().getMinutes() - 1) && (lastCalledMinutes !== new Date().getMinutes() + 1)) {
-                            console.log("Updating everything");
-                            lastCalledMinutes = new Date().getMinutes();
-                            await updateEverything();
-                        }
-                    }
-                    if (end == true) {
-                        process.exit();
+        }
+        await part1().then(async () => {
+            if (index == chats.length) {
+                console.log("overwriting");
+                await db.overwriteOne('ids', batch.ids);
+                await db.overwriteOne('messages', batch.messages);
+                await db.overwriteOne('users', batch.users);
+                await db.overwriteOne('moderation', batch.moderation);
+                await db.overwriteOne('stream', batch.stream);
+                await db.overwriteOne('giveaway', batch.giveaway);
+                await db.overwriteOne('settings', batch.settings);
+                await db.overwriteOne('counting', batch.counting);
+                await db.overwriteOne('commands', batch.commands);
+                await db.overwriteOne('votes', batch.votes);
+                await db.overwriteOne('connection', batch.connection);
+                await db.overwriteOne('commands', batch.commands);
+                batch = {
+                    "ids": [],
+                    "messages": [],
+                    "users": [],
+                    "moderation": {},
+                    "stream": {},
+                    "giveaway": {},
+                    "settings": {},
+                    "counting": {},
+                    "commands": [],
+                    "votes": [],
+                    "connection": {},
+                    "commands": [],
+                    "active": false
+                }
+                if (new Date().getMinutes() !== lastCalledMinutes) {
+                    if ((new Date().getMinutes() % 5 == 0) || ((new Date().getMinutes() % 5) == (lastCalledMinutes + 1)) && (lastCalledMinutes !== new Date().getMinutes() - 1) && (lastCalledMinutes !== new Date().getMinutes() + 1)) {
+                        console.log("Updating everything");
+                        lastCalledMinutes = new Date().getMinutes();
+                        await updateEverything();
                     }
                 }
-            });
-        }
+                if (end == true) {
+                    process.exit();
+                }
+            }
+            return "";
+        });
     }
-    first = false;
+    goingThroughMessages = false;
 }
 
 setInterval(async () => {
@@ -381,7 +392,8 @@ async function logMessage(chat, start) {
                     if ((!userFound.xp) || (userFound.xp == null) || (userFound.xp == undefined) || (isNaN(userFound.xp))) {
                         userFound.xp = 0;
                     }
-                    userFound.xp = parseInt(userFound.xp) + 1;
+                    //triple
+                    userFound.xp = parseInt(userFound.xp) + 3;
                     if (userFound.id !== process.argv[4]) {
                         if (checkmilestone(parseInt(userFound.messages))) {
                             sendMSG(`${userFound.name} has sent ${userFound.messages.toLocaleString()} messages!`);
@@ -429,7 +441,13 @@ async function logMessage(chat, start) {
                         firstseen: parseFloat(chat.timestampUsec),
                         active: true,
                         blacklist: [],
-                        hourlyStats: {},
+                        hourlyStats: {
+                            "0": {
+                                "messages": 0,
+                                "xp": 0,
+                                "points": 0
+                            }
+                        },
                         dailyStats: {},
                         warnings: []
                     };
@@ -495,6 +513,8 @@ async function logMessage(chat, start) {
                                     if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
                                         batch.users[userIndex].xp = 0;
                                     }
+                                    //triple
+                                    add = add * 3;
                                     batch.users[userIndex].xp += add;
                                 } else {
                                     console.log("User not found");
@@ -506,6 +526,8 @@ async function logMessage(chat, start) {
                                     if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
                                         batch.users[userIndex].xp = 0;
                                     }
+                                    //triple
+                                    add = add * 3;
                                     batch.users[userIndex].xp += add
                                 } else {
                                     console.log("User not found");
@@ -513,7 +535,7 @@ async function logMessage(chat, start) {
                                 return await handleCommand(chat, commands[i]);
                             }
                         }
-                        if (cmd == false) {
+                        if ((cmd == false) && (chat.message)) {
                             if (stringify(chat.message).toLowerCase().includes(giveaway.command.toLowerCase()) || giveaway.command.toLowerCase() == stringify(chat.message).toLowerCase()) {
                                 if (giveaway.enabled) {
                                     return await handleGiveaway(chat, commands[i], i);
@@ -525,14 +547,16 @@ async function logMessage(chat, start) {
                                         if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
                                             batch.users[userIndex].xp = 0;
                                         }
-                                        batch.users[userIndex].xp += 5;
+                                        //triple
+                                        batch.users[userIndex].xp += 15
                                     } else {
                                         console.log("User not found");
                                     }
                                     if (checkmilestone(counting.number + 1)) {
                                         sendMSG(`${chat.authorName} has counted to ${counting.number + 1}!`);
                                         if (userIndex !== -1) {
-                                            batch.users[userIndex].xp += 15;
+                                            //triple
+                                            batch.users[userIndex].xp += 45;
                                         }
                                     }
                                     return await handleCounting(chat);
@@ -546,7 +570,8 @@ async function logMessage(chat, start) {
                                     if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
                                         batch.users[userIndex].xp = 0;
                                     }
-                                    batch.users[userIndex].xp += 5;
+                                    //triple
+                                    batch.users[userIndex].xp += 15;
                                 } else {
                                     console.log("User not found");
                                 }
@@ -565,7 +590,8 @@ async function logMessage(chat, start) {
                                     if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
                                         batch.users[userIndex].xp = 0;
                                     }
-                                    batch.users[userIndex].xp += 10;
+                                    //triple
+                                    batch.users[userIndex].xp += 15
                                 }
                             }
                         }
@@ -949,7 +975,8 @@ async function variableCheck(response, msg, cmd) {
                             if ((!batch.users[i].xp) || (batch.users[i].xp == null) || (batch.users[i].xp == undefined) || (isNaN(batch.users[i].xp))) {
                                 batch.users[i].xp = 0;
                             }
-                            batch.users[i].xp += 10;
+                            //triple
+                            batch.users[i].xp += 15;
                         }
                     }
                     for (let i = 0; i < batch.votes.length; i++) {
@@ -1199,7 +1226,274 @@ mc.on("end", () => {
     console.log("Connection closed");
     process.exit();
 });
-
+var timeslol = [
+    {
+        "Area": "Christmas Island/Kiribati",
+        "Timezone": "LINT",
+        "date": "Dec 31, 2023 4:00:00",
+        "utc": "UTC+14",
+        "cities": "Kiritimati"
+    },
+    {
+        "Area": "Chatham Islands/New Zealand",
+        "Timezone": "CHADT",
+        "date": "Dec 31, 2023 4:15:00",
+        "utc": "UTC+13:45",
+        "cities": "Chatham Islands"
+    },
+    {
+        "Area": "New Zealand with exceptions and 5 more",
+        "Timezone": "NZDT",
+        "date": "Dec 31, 2023 5:00:00",
+        "utc": "UTC+13",
+        "cities": "Auckland, Wellington, Nuku'alofa, Apia"
+    },
+    {
+        "Area": "Fiji, small region of Russia and 7 more",
+        "Timezone": "ANAT",
+        "date": "Dec 31, 2023 6:00:00",
+        "utc": "UTC+12",
+        "cities": "Anadyr, Suva, Funafuti, Yaren, Tarawa"
+    },
+    {
+        "Area": "Much of Australia and 7 more",
+        "Timezone": "AEDT",
+        "date": "Dec 31, 2023 7:00:00",
+        "utc": "UTC+11",
+        "cities": "Melbourne, Sydney, Canberra, Honiara"
+    },
+    {
+        "Area": "Small region of Australia",
+        "Timezone": "ACDT",
+        "date": "Dec 31, 2023 7:30:00",
+        "utc": "UTC+10:30",
+        "cities": "Adelaide, Broken Hill, Ceduna"
+    },
+    {
+        "Area": "Queensland/Australia and 6 more",
+        "Timezone": "AEST",
+        "date": "Dec 31, 2023 8:00:00",
+        "utc": "UTC+10",
+        "cities": "Brisbane, Port Moresby, Hagåtña"
+    },
+    {
+        "Area": "Northern Territory/Australia",
+        "Timezone": "ACST",
+        "date": "Dec 31, 2023 8:30:00",
+        "utc": "UTC+9:30",
+        "cities": "Darwin, Alice Springs, Tennant Creek"
+    },
+    {
+        "Area": "Japan, South Korea and 5 more",
+        "Timezone": "JST",
+        "date": "Dec 31, 2023 9:00:00",
+        "utc": "UTC+9",
+        "cities": "Tokyo, Seoul, Pyongyang, Dili, Ngerulmud"
+    },
+    {
+        "Area": "Western Australia/Australia",
+        "Timezone": "ACWST",
+        "date": "Dec 31, 2023 9:15:00",
+        "utc": "UTC+8:45",
+        "cities": "Eucla"
+    },
+    {
+        "Area": "China, Philippines and 10 more",
+        "Timezone": "CST",
+        "date": "Dec 31, 2023 10:0:00",
+        "utc": "UTC+8",
+        "cities": "Beijing, Hong Kong, Manila, Singapore"
+    },
+    {
+        "Area": "Much of Indonesia, Thailand and 7 more",
+        "Timezone": "WIB",
+        "date": "Dec 31, 2023 11:0:00",
+        "utc": "UTC+7",
+        "cities": "Jakarta, Bangkok, Hanoi, Phnom Penh"
+    },
+    {
+        "Area": "Myanmar and Cocos Islands",
+        "Timezone": "MMT",
+        "date": "Dec 31, 2023 11:30:00",
+        "utc": "UTC+6:30",
+        "cities": "Yangon, Naypyidaw, Mandalay, Bantam"
+    },
+    {
+        "Area": "Bangladesh and 6 more",
+        "Timezone": "BST",
+        "date": "Dec 31, 2023 12:00:00",
+        "utc": "UTC+6",
+        "cities": "Dhaka, Almaty, Bishkek, Thimphu, Astana"
+    },
+    {
+        "Area": "Nepal",
+        "Timezone": "NPT",
+        "date": "Dec 31, 2023 12:15:00",
+        "utc": "UTC+5:45",
+        "cities": "Kathmandu, Pokhara, Biratnagar, Dharan"
+    },
+    {
+        "Area": "India and Sri Lanka",
+        "Timezone": "IST",
+        "date": "Dec 31, 2023 12:30:00",
+        "utc": "UTC+5:30",
+        "cities": "New Delhi, Mumbai, Kolkata, Bengaluru"
+    },
+    {
+        "Area": "Pakistan and 8 more",
+        "Timezone": "UZT",
+        "date": "Dec 31, 2023 13:00:00",
+        "utc": "UTC+5",
+        "cities": "Tashkent, Islamabad, Lahore, Karachi"
+    },
+    {
+        "Area": "Afghanistan",
+        "Timezone": "AFT",
+        "date": "Dec 31, 2023 13:30:00",
+        "utc": "UTC+4:30",
+        "cities": "Kabul, Kandahar, Mazari Sharif, Herat"
+    },
+    {
+        "Area": "Azerbaijan and 8 more",
+        "Timezone": "GST",
+        "date": "Dec 31, 2023 14:00:00",
+        "utc": "UTC+4",
+        "cities": "Dubai, Abu Dhabi, Muscat, Port Louis"
+    },
+    {
+        "Area": "Iran",
+        "Timezone": "IRST",
+        "date": "Dec 31, 2023 14:30:00",
+        "utc": "UTC+3:30",
+        "cities": "Tehran, Rasht, Esfahãn, Mashhad, Tabriz"
+    },
+    {
+        "Area": "Moscow/Russia, Turkey and 20 more",
+        "Timezone": "MSK",
+        "date": "Dec 31, 2023 15:00:00",
+        "utc": "UTC+3",
+        "cities": "Moscow, Ankara, Baghdad, Nairobi"
+    },
+    {
+        "Area": "Greece and 32 more",
+        "Timezone": "EET",
+        "date": "Dec 31, 2023 16:00:00",
+        "utc": "UTC+2",
+        "cities": "Cairo, Athens, Bucharest, Johannesburg"
+    },
+    {
+        "Area": "Germany and 45 more",
+        "Timezone": "CET",
+        "date": "Dec 31, 2023 17:00:00",
+        "utc": "UTC+1",
+        "cities": "Brussels, Madrid, Paris, Rome, Algiers"
+    },
+    {
+        "Area": "United Kingdom and 24 more",
+        "Timezone": "GMT",
+        "date": "Dec 31, 2023 18:00:00",
+        "utc": "UTC+0",
+        "cities": "London, Dublin, Lisbon, Accra, Reykjavik"
+    },
+    {
+        "Area": "Cabo Verde and 2 more",
+        "Timezone": "CVT",
+        "date": "Dec 31, 2023 19:00:00",
+        "utc": "UTC-1",
+        "cities": "Praia, Ponta Delgada, Ittoqqortoormiit"
+    },
+    {
+        "Area": "Pernambuco/Brazil and South Georgia/Sandwich Is.",
+        "Timezone": "GST",
+        "date": "Dec 31, 2023 20:00:00",
+        "utc": "UTC-2",
+        "cities": "King Edward Point, Fernando de Noronha"
+    },
+    {
+        "Area": "Most of Brazil, Argentina and 9 more",
+        "Timezone": "ART",
+        "date": "Dec 31, 2023 21:00:00",
+        "utc": "UTC-3",
+        "cities": "Buenos Aires, Rio de Janeiro, Santiago"
+    },
+    {
+        "Area": "Newfoundland and Labrador/Canada",
+        "Timezone": "NST",
+        "date": "Dec 31, 2023 21:30:00",
+        "utc": "UTC-3:30",
+        "cities": "St. John's, Mary's Harbour"
+    },
+    {
+        "Area": "Some regions of Canada and 28 more",
+        "Timezone": "VET",
+        "date": "Dec 31, 2023 22:00:00",
+        "utc": "UTC-4",
+        "cities": "Caracas, La Paz, San Juan, Santo Domingo"
+    },
+    {
+        "Area": "Regions of USA and 14 more",
+        "Timezone": "EST",
+        "date": "Dec 31, 2023 23:00:00",
+        "utc": "UTC-5",
+        "cities": "New York, Washington DC, Detroit, Havana"
+    },
+    {
+        "Area": "Regions of USA and 9 more",
+        "Timezone": "CST",
+        "date": "Dec 31, 2023 24:00:00",
+        "utc": "UTC-6",
+        "cities": "Mexico City, Chicago, Guatemala City"
+    },
+    {
+        "Area": "Some regions of USA and 2 more",
+        "Timezone": "MST",
+        "date": "Jan 1, 2023 1:00:00",
+        "utc": "UTC-7",
+        "cities": "Calgary, Denver, Edmonton, Phoenix"
+    },
+    {
+        "Area": "Regions of USA and 4 more",
+        "Timezone": "PST",
+        "date": "Jan 1, 2023 2:00:00",
+        "utc": "UTC-8",
+        "cities": "Los Angeles, San Francisco, Las Vegas"
+    },
+    {
+        "Area": "Alaska/USA and regions of French Polynesia",
+        "Timezone": "AKST",
+        "date": "Jan 1, 2023 3:00:00",
+        "utc": "UTC-9",
+        "cities": "Anchorage, Fairbanks, Juneau, Unalaska"
+    },
+    {
+        "Area": "Marquesas Islands/French Polynesia",
+        "Timezone": "MART",
+        "date": "Jan 1, 2023 3:30:00",
+        "utc": "UTC-9:30",
+        "cities": "Taiohae"
+    },
+    {
+        "Area": "Small region of USA and 2 more",
+        "Timezone": "HST",
+        "date": "Jan 1, 2023 4:00:00",
+        "utc": "UTC-10",
+        "cities": "Honolulu, Rarotonga, Adak, Papeete"
+    },
+    {
+        "Area": "American Samoa and 2 more",
+        "Timezone": "NUT",
+        "date": "Jan 1, 2023 5:00:00",
+        "utc": "UTC-11",
+        "cities": "Alofi, Midway, Pago Pago"
+    },
+    {
+        "Area": "Much of US Minor Outlying Islands",
+        "Timezone": "AoE",
+        "date": "Jan 1, 2023 6:00:00",
+        "utc": "UTC-12",
+        "cities": "Baker Island, Howland Island"
+    }
+]
 async function updateEverything() {
     let pointGainers = [];
     let milestoneMessages = [];
@@ -1213,13 +1507,25 @@ async function updateEverything() {
                     if ((!users[i].xp) || (users[i].xp == NaN) || (users[i].xp == undefined) || (users[i].xp == null)) {
                         users[i].xp = 0;
                     }
-                    users[i].xp = (parseFloat(users[i].xp) + Math.floor(Math.random() * 5) + 1)
+                    //triple
+                    users[i].xp = (parseFloat(users[i].xp) + (Math.floor(Math.random() * 5) + 1) * 3);
                     users[i].active = false;
                     if (checkmilestone(parseInt(users[i].points))) {
                         milestoneMessages.push(`${users[i].name} has reached ${users[i].points.toLocaleString()} points!`);
                     }
                     users[i].hours = users[i].points / 12;
                     pointGainers.push(users[i].name);
+                    let time2 = new Date();
+                    time2.setSeconds(0);
+                    time2.setMilliseconds(0);
+                    for (let i = 0; i < timeslol.length; i++) {
+                        let time3 = new Date(timeslol[i].date);
+                        time3.setSeconds(0);
+                        time3.setMilliseconds(0);
+                        if (time3.getTime() == time2.getTime()) {
+                            users[i].xp = parseFloat(users[i].xp) + 50;
+                        }
+                    }
                     users[i].dailyStats[`${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`] = {
                         messages: users[i].messages,
                         points: users[i].points,
@@ -1234,14 +1540,14 @@ async function updateEverything() {
                         users[i].xp = 0;
                     }
                 }
-            }
-            if ((!users[i].xp) || (users[i].xp == NaN) || (users[i].xp == undefined) || (users[i].xp == null)) {
-                users[i].xp = 0;
-            }
-            users[i].hourlyStats[parseInt(new Date().getHours())] = {
-                messages: users[i].messages,
-                points: users[i].points,
-                xp: users[i].xp
+                if ((!users[i].xp) || (users[i].xp == NaN) || (users[i].xp == undefined) || (users[i].xp == null)) {
+                    users[i].xp = 0;
+                }
+                users[i].hourlyStats[parseInt(new Date().getHours())] = {
+                    messages: users[i].messages,
+                    points: users[i].points,
+                    xp: users[i].xp
+                }
             }
         }
         db.overwriteOne('users', users);
@@ -1259,6 +1565,31 @@ async function updateEverything() {
     }
 }
 
+setTimeout(async () => {
+    let users = await db.getOne('users');
+    for (let i = 0; i < users.length; i++) {
+        if (users[i].dailyStats) {
+            let keys = Object.keys(users[i].dailyStats);
+            let lastKey = keys[keys.length - 3];
+            if (users[i].dailyStats[lastKey]) {
+                if (users[i].dailyStats[lastKey].xp) {
+                    if (users[i].xp > 1000000) {
+                        lastKey = keys[keys.length - 4];
+                    }
+                    users[i].xp = users[i].dailyStats[lastKey].xp;
+                } else {
+                    users[i].xp = 0;
+                }
+            } else {
+                users[i].xp = 0;
+            }
+        } else {
+            users[i].xp = 0;
+        }
+    }
+    db.overwriteOne('users', users);
+}, 1000)
+
 setInterval(async () => {
     let timers = await db.getOne('timers');
     for (let i = 0; i < timers.length; i++) {
@@ -1272,10 +1603,11 @@ setInterval(async () => {
             sendMSG(timers[i].text);
         }
     }
-}, 1000)
+}, 10000)
 
 async function sendMSG(message) {
     if (message) {
+        console.log(message)
         if (message.length > 0) {
             if (message == "") {
                 return;
@@ -1289,14 +1621,16 @@ async function sendMSG(message) {
                 messages.push(message);
                 for (let i = 0; i < messages.length; i++) {
                     mc.sendMessage(messages[i]).catch((error) => {
-                        console.log(error)
+                        //console.log(error)
+                        //sendMSG(messages[i])
                     })
                 }
                 return
             } else {
                 message = message.toString()
                 mc.sendMessage(message).catch((error) => {
-                    console.log(error)
+                    //console.log(error)
+                    //sendMSG(message)
                 })
                 return
             }
