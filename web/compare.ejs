@@ -1003,110 +1003,109 @@
         }]
     });
 
-let messages_compared_chart = new Highcharts.chart({
-    navigation: {
-        buttonOptions: {
-            align: 'left'
-        }
-    },
-    chart: {
-        renderTo: 'messages_compared',
-        type: 'spline',
-        zoomType: 'x',
-        backgroundColor: 'transparent',
-        plotBorderColor: 'transparent'
-    },
-    title: {
-        text: ' '
-    },
-    credits: {
-        enabled: false,
-    },
-    xAxis: {
-        type: 'datetime',
-        visible: false
-    },
-    yAxis: {
-        visible: false,
-    },
-    plotOptions: {
-        series: {
-            threshold: null,
-            fillOpacity: 0.25
+    let messages_compared_chart = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
         },
-        area: {
-            fillOpacity: 0.25
-        }
-    },
-    series: [{
-        showInLegend: true,
-        name: '<%=user1.name%> Messages',
-        marker: { enabled: false },
-        color: '#FFF',
-        lineColor: '#FFF',
-        lineWidth: 2
-    }, {
-        showInLegend: true,
-        name: '<%=user2.name%> Messages',
-        marker: { enabled: false },
-        color: '#FFF',
-        lineColor: '#FFF',
-        lineWidth: 2
-    }]
-});
-
-let xp_compared_chart = new Highcharts.chart({
-    navigation: {
-        buttonOptions: {
-            align: 'left'
-        }
-    },
-    chart: {
-        renderTo: 'xp_compared',
-        type: 'spline',
-        zoomType: 'x',
-        backgroundColor: 'transparent',
-        plotBorderColor: 'transparent'
-    },
-    title: {
-        text: ' '
-    },
-    credits: {
-        enabled: false,
-    },
-    xAxis: {
-        type: 'datetime',
-        visible: false
-    },
-    yAxis: {
-        visible: false,
-    },
-    plotOptions: {
-        series: {
-            threshold: null,
-            fillOpacity: 0.25
+        chart: {
+            renderTo: 'messages_compared',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
         },
-        area: {
-            fillOpacity: 0.25
-        }
-    },
-    series: [{
-        showInLegend: true,
-        name: '<%=user1.name%> XP',
-        marker: { enabled: false },
-        color: '#FFF',
-        lineColor: '#FFF',
-        lineWidth: 2
-    }, {
-        showInLegend: true,
-        name: '<%=user2.name%> XP',
-        marker: { enabled: false },
-        color: '#FFF',
-        lineColor: '#FFF',
-        lineWidth: 2
-    }]
-});
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: '<%=user1.name%> Messages',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2
+        }, {
+            showInLegend: true,
+            name: '<%=user2.name%> Messages',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2
+        }]
+    });
 
+    let xp_compared_chart = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'xp_compared',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: '<%=user1.name%> XP',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2
+        }, {
+            showInLegend: true,
+            name: '<%=user2.name%> XP',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2
+        }]
+    });
 
     subs()
     setInterval(subs, 10000)

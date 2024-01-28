@@ -8,6 +8,8 @@ import { fork } from 'child_process';
 import esm from 'express-status-monitor';
 import cors from 'cors';
 import db from './db.js';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 const app = express();
 app.use(cors());
 app.use(esm());
@@ -16,8 +18,6 @@ app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.set('view engine', 'ejs');
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 if (!fs.existsSync('./user')) {
