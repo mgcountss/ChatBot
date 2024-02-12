@@ -721,7 +721,7 @@
                 "entryRank": document.getElementById("entryrank").value,
                 "command": document.getElementById("command").value,
             }
-            fetch("/editGiveaway", {
+            fetch("/api/edit/giveaway", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -737,7 +737,7 @@
         }
 
         function startGiveaway() {
-            fetch("/editGiveaway", {
+            fetch("/api/edit/giveaway", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -753,7 +753,7 @@
         }
 
         function endGiveaway() {
-            fetch("/editGiveaway", {
+            fetch("/api/edit/giveaway", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -769,7 +769,7 @@
         }
 
         function clearGiveaway() {
-            fetch("/editGiveaway", {
+            fetch("/api/edit/giveaway", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -785,7 +785,7 @@
         }
 
         function rerollGiveaway() {
-            fetch("/editGiveaway", {
+            fetch("/api/edit/giveaway", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -856,7 +856,7 @@
         function loadMoreLogs() {
             logHolder[0] += 30;
             logHolder[1] += 30;
-            fetch('/logs/' + logHolder[0] + "/" + logHolder[1])
+            fetch('/api/view/logs?min=' + logHolder[0] + "&max=" + logHolder[1])
                 .then(function (response) {
                     return response.json();
                 })
@@ -874,7 +874,7 @@
         function loadMoreVotes() {
             voteHolder[0] += 30;
             voteHolder[1] += 30;
-            fetch('/votes/' + voteHolder[0] + "/" + voteHolder[1])
+            fetch('/api/view/votes?min=' + voteHolder[0] + "&max=" + voteHolder[1])
                 .then(function (response) {
                     return response.json();
                 })
@@ -892,7 +892,7 @@
             if (!m) {
                 return;
             } else {
-                fetch('/removeUser', {
+                fetch('/api/remove/user', {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
@@ -911,7 +911,7 @@
         function expandSearch() {
             pointHolder[0] += 15;
             pointHolder[1] += 15;
-            fetch('/search/' + pointHolder[0] + "/" + pointHolder[1], {
+            fetch('/api/view/search?min=' + pointHolder[0] + "&max=" + pointHolder[1], {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -950,7 +950,7 @@
         }
         function searchTable() {
             pointHolder = [0, 15]
-            fetch('/search/' + pointHolder[0] + "/" + pointHolder[1], {
+            fetch('/api/view/search?min=' + pointHolder[0] + "&max=" + pointHolder[1], {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -1008,7 +1008,7 @@
         function loadMorePoints() {
             pointHolder[0] += 15;
             pointHolder[1] += 15;
-            fetch('/points/' + pointHolder[0] + "/" + pointHolder[1] + "?sort=" + sort1)
+            fetch('/api/view/any?type=points&min=' + pointHolder[0] + "&max=" + pointHolder[1] + "&sort=" + sort1)
                 .then(function (response) {
                     return response.json();
                 })
@@ -1107,7 +1107,7 @@
 
         let chatInterval = setInterval(getChat, 5000);
         function getChat() {
-            fetch('/chat')
+            fetch('/api/view/chat')
                 .then(response => response.json())
                 .then(data => {
                     data.messages = data.messages.sort((a, b) => parseFloat(a.timestampUsec) - parseFloat(b.timestampUsec))
@@ -1233,7 +1233,7 @@
             if (type == 'points2') {
                 type = 'points';
             }
-            fetch('/updateUser', {
+            fetch('/api/edit/user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1254,7 +1254,7 @@
         }
 
         function deleteMsg(id) {
-            fetch('/deleteMsg', {
+            fetch('/api/chat/deleteMsg', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1274,7 +1274,7 @@
         }
 
         function timeoutUser(id) {
-            fetch('/timeout', {
+            fetch('/api/chat/timeout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1293,7 +1293,7 @@
         }
 
         function banUser(id) {
-            fetch('/ban', {
+            fetch('/api/chat/ban', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1373,7 +1373,7 @@
                 alert("Cooldown must be a number!");
                 return;
             }
-            fetch('/addCommand', {
+            fetch('/api/add/command', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1410,7 +1410,7 @@
                 alert("Interval must be a number!");
                 return;
             }
-            fetch('/addTimer', {
+            fetch('/api/add/timer', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1447,7 +1447,7 @@
                 alert("Interval must be a number!");
                 return;
             }
-            fetch('/editTimer', {
+            fetch('/api/edit/timer', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1474,7 +1474,7 @@
             let data = {
                 id: id
             }
-            fetch('/removeTimer', {
+            fetch('/api/remove/timer', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1501,7 +1501,7 @@
             let data = {
                 name: name
             }
-            fetch('/removeCommand', {
+            fetch('/api/remove/command', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1544,7 +1544,7 @@
                 alert("Cooldown must be a number!");
                 return;
             }
-            fetch('/editCommand', {
+            fetch('/api/edit/command', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1563,7 +1563,7 @@
         }
 
         function updateGiveaway() {
-            fetch('/giveaway')
+            fetch('/api/view/giveaway')
                 .then(response => response.json())
                 .then(data => {
                     let winner = ""
@@ -1589,7 +1589,7 @@
         setInterval(updateGiveaway, 10000)
 
         function updateUses(id) {
-            fetch('/editCommand', {
+            fetch('/api/edit/command', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1607,7 +1607,7 @@
         }
 
         function checkforstream() {
-            fetch('/checkforstream', {
+            fetch('/api/checkforstream', {
                 method: 'POST'
             }).then(response => response.json())
                 .then(data => {
@@ -1620,7 +1620,7 @@
         }
 
         function enableBot() {
-            fetch('/settings/enable').then(response => response.json())
+            fetch('/api/settings/enable').then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         alert("Bot " + data.enabled + "!");
@@ -1632,7 +1632,7 @@
         }
 
         function enableCounting() {
-            fetch('/counting/enable').then(response => response.json())
+            fetch('/api/settings/counting').then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         alert("Counting " + data.enabled + "!");
@@ -1644,7 +1644,7 @@
         }
 
         function enableCurrency() {
-            fetch('/currency/enable').then(response => response.json())
+            fetch('/api/settings/currency').then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         alert("Currency " + data.enabled + "!");
@@ -1656,7 +1656,7 @@
         }
 
         function saveModeration() {
-            fetch("/settings/moderation", {
+            fetch("/api/settings/moderation", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

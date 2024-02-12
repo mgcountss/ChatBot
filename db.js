@@ -1,4 +1,20 @@
 import fs from 'fs';
+let db = {
+  commands: JSON.parse(fs.readFileSync('./user/db/commands.json', 'utf8')),
+  connection: JSON.parse(fs.readFileSync('./user/db/connection.json', 'utf8')),
+  counting: JSON.parse(fs.readFileSync('./user/db/counting.json', 'utf8')),
+  currency: JSON.parse(fs.readFileSync('./user/db/currency.json', 'utf8')),
+  giveaway: JSON.parse(fs.readFileSync('./user/db/giveaway.json', 'utf8')),
+  ids: JSON.parse(fs.readFileSync('./user/db/ids.json', 'utf8')),
+  messages: JSON.parse(fs.readFileSync('./user/db/messages.json', 'utf8')),
+  moderation: JSON.parse(fs.readFileSync('./user/db/moderation.json', 'utf8')),
+  quotes: JSON.parse(fs.readFileSync('./user/db/quotes.json', 'utf8')),
+  settings: JSON.parse(fs.readFileSync('./user/db/settings.json', 'utf8')),
+  stream: JSON.parse(fs.readFileSync('./user/db/stream.json', 'utf8')),
+  timers: JSON.parse(fs.readFileSync('./user/db/timers.json', 'utf8')),
+  users: JSON.parse(fs.readFileSync('./user/db/users.json', 'utf8')),
+  votes: JSON.parse(fs.readFileSync('./user/db/votes.json', 'utf8'))
+}
 
 const findUserIdFromToken = async (token) => {
   try {
@@ -16,16 +32,14 @@ const findUserIdFromToken = async (token) => {
 
 const getOne = async (type) => {
   try {
-    let json = JSON.parse(fs.readFileSync(`./user/db/${type}.json`, "utf8"));
+    let json = db[type];
     return json;
   } catch (error) { }
 };
 
 const overwriteOne = async (type, value) => {
   try {
-    let json = JSON.parse(fs.readFileSync(`./user/db/${type}.json`, "utf8"));
-    json = value;
-    fs.writeFileSync(`./user/db/${type}.json`, JSON.stringify(json), "utf8");
+    db[type] = value;
   } catch (error) {
     console.log(error);
   }
@@ -33,100 +47,112 @@ const overwriteOne = async (type, value) => {
 
 const deleteFromArray = async (type, key, value) => {
   try {
-    let json = JSON.parse(fs.readFileSync(`./user/db/${type}.json`, "utf8"));
+    let json = db[type];
     json = json.filter((item) => item[key] !== value);
-    fs.writeFileSync(`./user/db/${type}.json`, JSON.stringify(json), "utf8");
+    db[type] = json;
   } catch (error) { }
 };
 
-const addObject = async (type, value) => {
+const addTo = async (type, value) => {
   try {
-    let json = JSON.parse(fs.readFileSync(`./user/db/${type}.json`, "utf8"));
+    let json = db[type];
     json.push(value);
-    fs.writeFileSync(`./user/db/${type}.json`, JSON.stringify(json), "utf8");
+    db[type] = json;
   } catch (error) { }
 };
 
 const removeObject = async (type, key, value) => {
   try {
-    let json = JSON.parse(fs.readFileSync(`./user/db/${type}.json`, "utf8"));
+    let json = db[type];
     json = json.filter((item) => item[key] !== value);
-    fs.writeFileSync(`./user/db/${type}.json`, JSON.stringify(json), "utf8");
+    db[type] = json;
   } catch (error) { }
 };
 
 const removeFirstObject = async (type) => {
   try {
-    let json = JSON.parse(fs.readFileSync(`./user/db/${type}.json`, "utf8"));
+    let json = db[type];
     json.shift();
-    fs.writeFileSync(`./user/db/${type}.json`, JSON.stringify(json), "utf8");
+    db[type] = json;
   } catch (error) { }
 };
 
 const pushToArray = async (type, key, value) => {
   try {
-    let json = JSON.parse(fs.readFileSync(`./user/db/${type}.json`, "utf8"));
+    let json = db[type];
     json[key].push(value);
-    fs.writeFileSync(`./user/db/${type}.json`, JSON.stringify(json), "utf8");
-  } catch (error) { }
-};
-
-const pushToArrayBasedOnKey = async (key, key2, value) => {
-  try {
-    let json = JSON.parse(fs.readFileSync(`./user/db/${key}.json`, "utf8"));
-    for (let i = 0; i < json.length; i++) {
-      if (json[i].id === key2) {
-        json[i][key].push(value);
-      }
-    }
-    fs.writeFileSync(`./user/db/${key}.json`, JSON.stringify(json), "utf8");
+    db[type] = json;
   } catch (error) { }
 };
 
 const editWithinArray = async (type, key, value, key2, value2) => {
   try {
-    let json = JSON.parse(fs.readFileSync(`./user/db/${type}.json`, "utf8"));
+    let json = db[type];
     for (let i = 0; i < json.length; i++) {
       if (json[i][key] === value) {
         json[i][key2] = value2;
       }
     }
-    fs.writeFileSync(`./user/db/${type}.json`, JSON.stringify(json), "utf8");
+    db[type] = json;
   } catch (error) { }
 };
 
 const overwriteObjectInArray = async (type, key, value, value2) => {
   try {
-    let json = JSON.parse(fs.readFileSync(`./user/db/${type}.json`, "utf8"));
-    let e = false;
+    let json = db[type];
     for (let i = 0; i < json.length; i++) {
       if (json[i][key] === value) {
         json[i] = value2;
-        e = true;
+        db[type] = json;
+        break;
       }
     }
-    fs.writeFileSync(`./user/db/${type}.json`, JSON.stringify(json), "utf8");
     return "success"
-  } catch (error) {}
+  } catch (error) { }
 };
 
 const overWriteAll = async (type, value) => {
   try {
-    fs.writeFileSync(`./user/db/${type}.json`, JSON.stringify(value), "utf8");
+    db[type] = value;
   } catch (error) { }
 };
+
+const addToWithinObject = async (type, key, value, key2, value2) => {
+  try {
+    let json = db[type];
+    json[key][value][key2].push(value2);
+    db[type] = json;
+  } catch (error) { }
+};
+
+setInterval(() => {
+  fs.writeFileSync('./user/db/commands.json', JSON.stringify(db.commands), 'utf8');
+  fs.writeFileSync('./user/db/connection.json', JSON.stringify(db.connection), 'utf8');
+  fs.writeFileSync('./user/db/counting.json', JSON.stringify(db.counting), 'utf8');
+  fs.writeFileSync('./user/db/currency.json', JSON.stringify(db.currency), 'utf8');
+  fs.writeFileSync('./user/db/giveaway.json', JSON.stringify(db.giveaway), 'utf8');
+  fs.writeFileSync('./user/db/ids.json', JSON.stringify(db.ids), 'utf8');
+  fs.writeFileSync('./user/db/messages.json', JSON.stringify(db.messages), 'utf8');
+  fs.writeFileSync('./user/db/moderation.json', JSON.stringify(db.moderation), 'utf8');
+  fs.writeFileSync('./user/db/quotes.json', JSON.stringify(db.quotes), 'utf8');
+  fs.writeFileSync('./user/db/settings.json', JSON.stringify(db.settings), 'utf8');
+  fs.writeFileSync('./user/db/stream.json', JSON.stringify(db.stream), 'utf8');
+  fs.writeFileSync('./user/db/timers.json', JSON.stringify(db.timers), 'utf8');
+  fs.writeFileSync('./user/db/users.json', JSON.stringify(db.users), 'utf8');
+  fs.writeFileSync('./user/db/votes.json', JSON.stringify(db.votes), 'utf8');
+}, 60000);
 
 export default {
   findUserIdFromToken,
   getOne,
   overwriteOne,
   deleteFromArray,
-  addObject,
+  addTo,
   removeObject,
   removeFirstObject,
   pushToArray,
-  pushToArrayBasedOnKey,
   editWithinArray,
   overwriteObjectInArray,
-  overWriteAll
+  overWriteAll,
+  addToWithinObject
 };

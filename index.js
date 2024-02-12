@@ -4,16 +4,13 @@ import cookieParser from 'cookie-parser';
 import fs from 'fs';
 import { stringify } from 'masterchat'
 import { request } from 'undici';
-import { fork } from 'child_process';
-import esm from 'express-status-monitor';
 import cors from 'cors';
 import db from './db.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import chatbot from './chatbot.js';
 const app = express();
 app.use(cors());
-app.use(esm());
-let Child;
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -24,64 +21,22 @@ if (!fs.existsSync('./user')) {
     fs.mkdirSync('./user');
     fs.writeFileSync('./user/key.json', JSON.stringify({}));
 }
-
-async function getStream(id, id2) {
-    try {
-        let url = 'https://www.youtube.com/watch?v=pnZ8bRsjSAs'// + id2;
-        const { body } = await request(url);
-        let bodyText = await body.text();
-        let stream = bodyText.match(/(?<=hlsManifestUrl":").*\.m3u8/g);
-        if (stream) {
-            let id = bodyText.split(`<link rel="canonical" href="https://www.youtube.com/watch?v=`)[1].split(`">`)[0];
-            let title = bodyText.split(`<title>`)[1].split(` - YouTube</title>`)[0];
-            let viewers = bodyText.split(`viewCount":{"runs":[{"text":"`)[1].split(`"`)[0];
-            return {
-                "stream": {
-                    "id": id,
-                    "title": title,
-                    "viewers": viewers,
-                }
-            };
-        } else {
-            //let url = 'https://www.youtube.com/channel/' + id + '/live';
-            let url = 'https://www.youtube.com/watch?v=pnZ8bRsjSAs'// + id2;
-            const { body } = await request(url);
-            let bodyText = await body.text();
-            let stream = bodyText.match(/(?<=hlsManifestUrl":").*\.m3u8/g);
-            if (stream) {
-                let id = bodyText.split(`<link rel="canonical" href="https://www.youtube.com/watch?v=`)[1].split(`">`)[0];
-                let title = bodyText.split(`<title>`)[1].split(` - YouTube</title>`)[0];
-                let viewers = bodyText.split(`viewCount":{"runs":[{"text":"`)[1].split(`"`)[0];
-                return {
-                    "stream": {
-                        "id": id,
-                        "title": title,
-                        "viewers": viewers,
-                    }
-                };
-            } else {
-                return ({ "stream": null });
-            }
-        }
-    } catch (e) {
-        console.log(e)
-        return ({ "stream": null });
-    }
-}
+let chat = await await db.getOne('messages');
+let currency = [];
+setInterval(async () => {
+    chat = await await db.getOne('messages')
+}, 5000)
 
 const logRoute = (req, res) => {
     //console.log(req.method + ' ' + req.url, req['ip']);
 }
 
-app.get('/', async (req, res) => {
-    logRoute(req, res)
-    res.sendFile(__dirname + '/web/index.html');
-});
 
-app.get('/count', async (req, res) => {
+/*---------------/api/view/-----------------*/
+app.get('/api/view/counting', async (req, res) => {
     logRoute(req, res)
     try {
-        let counting = await db.getOne('counting')
+        let counting = await await db.getOne('counting')
         if (counting) {
             if (!counting.messages) {
                 restoreLastBackup()
@@ -103,88 +58,9 @@ app.get('/count', async (req, res) => {
     }
 });
 
-app.post('/editGiveaway', async (req, res) => {
+app.get('/api/view/giveaway', async (req, res) => {
     logRoute(req, res)
-    if (req.body.prize && req.body.entryRank && req.body.requirementAmount && req.body.requirementType && req.body.command) {
-        if (req.cookies['chatbot']) {
-            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
-                let currentGiveaway = await db.getOne('giveaway')
-                let giveaway = {
-                    enabled: currentGiveaway.enabled,
-                    winner: currentGiveaway.winner,
-                    prize: req.body.prize,
-                    entries: currentGiveaway.entries,
-                    entryRank: req.body.entryRank,
-                    requirementAmount: req.body.requirementAmount,
-                    requirementType: req.body.requirementType,
-                    command: req.body.command
-                }
-                db.overwriteOne('giveaway', giveaway)
-                res.send({ success: true })
-            } else {
-                res.send('Unauthorized')
-            }
-        } else {
-            res.send('Unauthorized')
-        }
-    } else if (req.body.clear) {
-        if (req.cookies['chatbot']) {
-            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
-                let currentGiveaway = await db.getOne('giveaway')
-                currentGiveaway.entries = [];
-                currentGiveaway.winner = '';
-                currentGiveaway.enabled = false;
-                db.overwriteOne('giveaway', currentGiveaway)
-                res.send({ success: true })
-            } else {
-                res.send('Unauthorized')
-            }
-        }
-    } else if (req.body.reroll) {
-        if (req.cookies['chatbot']) {
-            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
-                let currentGiveaway = await db.getOne('giveaway')
-                currentGiveaway.winner = '';
-                let winner = currentGiveaway.entries[Math.floor(Math.random() * currentGiveaway.entries.length)];
-                currentGiveaway.winner = winner;
-                db.overwriteOne('giveaway', currentGiveaway)
-                res.send({ success: true })
-            } else {
-                res.send('Unauthorized')
-            }
-        }
-    } else if (req.body.start) {
-        if (req.cookies['chatbot']) {
-            let currentGiveaway = await db.getOne('giveaway')
-            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
-                currentGiveaway.enabled = true;
-                db.overwriteOne('giveaway', currentGiveaway)
-                res.send({ success: true })
-            } else {
-                res.send('Unauthorized')
-            }
-        }
-    } else if (req.body.stop) {
-        if (req.cookies['chatbot']) {
-            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
-                let currentGiveaway = await db.getOne('giveaway')
-                currentGiveaway.enabled = false;
-                let winner = currentGiveaway.entries[Math.floor(Math.random() * currentGiveaway.entries.length)];
-                currentGiveaway.winner = winner;
-                db.overwriteOne('giveaway', currentGiveaway)
-                res.send({ success: true })
-            } else {
-                res.send('Unauthorized')
-            }
-        }
-    } else {
-        res.send('Error')
-    }
-});
-
-app.get('/giveaway', async (req, res) => {
-    logRoute(req, res)
-    let currentGiveaway = await db.getOne('giveaway')
+    let currentGiveaway = await await db.getOne('giveaway')
     if (currentGiveaway) {
         if (currentGiveaway.entries) {
             for (let i = 0; i < currentGiveaway.entries.length; i++) {
@@ -200,81 +76,24 @@ app.get('/giveaway', async (req, res) => {
     }
 });
 
-app.post('/search/:min/:max', async (req, res) => {
+app.get('/api/view/logs', async (req, res) => {
     logRoute(req, res)
-    if (req.body.search == undefined) return res.send('Error' + req.body.search)
-    let users = await db.getOne('users')
-    if (users) {
-        let things = [...users];
-        let query = req.body.search.toLowerCase();
-        let results = things.filter(x => x.name.toLowerCase().includes(query) || x.id.toLowerCase().includes(query));
-        results = results.slice(parseInt(req.params.min), parseInt(req.params.max));
-        for (let i = 0; i < results.length; i++) {
-            delete results[i].cooldown
-            delete results[i].dailyStats
-            delete results[i].hourlyStats
-            results[i].warns = results[i].warnings ? results[i].warnings : []
-            results[i].warnings = results[i].warnings ? results[i].warnings.length : 0
-        }
-        res.send(results)
-    } else {
-        res.send('Error')
-    }
-});
-
-app.post('/removeUser', async (req, res) => {
-    logRoute(req, res)
-    if (req.body.id == undefined) return res.send('Error')
-    if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        if (userID) {
-            db.deleteFromArray('users', 'id', req.body.id)
-            res.send({ success: true })
-        } else {
-            res.send('Error')
-        }
-    } else {
-        res.send('Unauthorized')
-    }
-});
-
-app.post('/checkforstream', async (req, res) => {
-    logRoute(req, res)
-    if (req.cookies['chatbot']) {
-        console.log('has cookies')
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        if (userID) {
-            console.log('is logged in')
-            endStream()
-            res.send({ success: true })
-        } else {
-            res.send('Error')
-            console.log('is not logged in')
-        }
-    } else {
-        res.send('Error')
-        console.log('has no cookies')
-    }
-});
-
-app.get('/logs/:min/:max', async (req, res) => {
-    logRoute(req, res)
-    let logs = await db.getOne('messages')
+    let logs = await await db.getOne('messages')
     if (logs) {
         let things = [...logs];
         things = things.reverse();
-        things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
+        things = things.slice(parseInt(req.query.min), parseInt(req.query.max));
         res.send(things)
     } else {
         res.send('Error')
     }
 });
 
-app.get('/totals', async (req, res) => {
+app.get('/api/view/totals', async (req, res) => {
     logRoute(req, res)
-    let users = await db.getOne('users')
-    let stream = await db.getOne('stream')
-    let votes = await db.getOne('votes')
+    let users = await await db.getOne('users')
+    let stream = await await db.getOne('stream')
+    let votes = await await db.getOne('votes')
     if (users && stream && votes) {
         let messages = stream.messages;
         let points = 0;
@@ -302,9 +121,37 @@ app.get('/totals', async (req, res) => {
     }
 });
 
-app.get('/votes', async (req, res) => {
+app.get('/api/view/chat', async (req, res) => {
     logRoute(req, res)
-    let votes = await db.getOne('votes')
+    try {
+        let messages = chat;
+        if (messages) {
+            messages = [...messages]
+            messages = messages.sort((a, b) => {
+                return parseFloat(a.timestampUsec) - parseFloat(b.timestampUsec);
+            });
+            res.status(200).send({
+                messages: messages.slice(-25),
+                success: true
+            });
+        } else {
+            res.status(401).send({
+                error: 'unknown error',
+                success: false
+            });
+        }
+    } catch (e) {
+        console.log(e)
+        res.status(404).send({
+            error: 'Not found',
+            success: false
+        });
+    }
+});
+
+app.get('/api/view/votes', async (req, res) => {
+    logRoute(req, res)
+    let votes = await await db.getOne('votes')
     if (votes) {
         res.send(votes)
     } else {
@@ -312,223 +159,211 @@ app.get('/votes', async (req, res) => {
     }
 });
 
-app.get('/countup.js', async (req, res) => {
+app.get('/api/view/any', async (req, res) => {
     logRoute(req, res)
-    res.sendFile(__dirname + '/web/countup.js');
-});
-app.get('/odometer.js', async (req, res) => {
-    logRoute(req, res)
-    res.sendFile(__dirname + '/web/odometer.js');
-});
-app.get('/odometer.css', async (req, res) => {
-    logRoute(req, res)
-    res.sendFile(__dirname + '/web/odometer.css');
-});
-
-function restoreLastBackup() {
-    let backups = fs.readdirSync('./user/archives');
-    backups.sort(function (a, b) {
-        return fs.statSync('./user/archives/' + b).mtime.getTime() - fs.statSync('./user/archives/' + a).mtime.getTime();
-    });
-    let file = fs.readFileSync('./user/archives/' + backups[0]);
-    let json = JSON.parse(file);
-    fs.writeFileSync('./user/db/commands.json', JSON.stringify(json.commands));
-    fs.writeFileSync('./user/db/connection.json', JSON.stringify(json.connection));
-    fs.writeFileSync('./user/db/counting.json', JSON.stringify(json.counting));
-    fs.writeFileSync('./user/db/giveaway.json', JSON.stringify(json.giveaway));
-    fs.writeFileSync('./user/db/ids.json', JSON.stringify(json.ids));
-    fs.writeFileSync('./user/db/messages.json', JSON.stringify(json.messages));
-    fs.writeFileSync('./user/db/moderation.json', JSON.stringify(json.moderation));
-    fs.writeFileSync('./user/db/settings.json', JSON.stringify(json.settings));
-    fs.writeFileSync('./user/db/stream.json', JSON.stringify(json.stream));
-    fs.writeFileSync('./user/db/timers.json', JSON.stringify(json.timers));
-    fs.writeFileSync('./user/db/users.json', JSON.stringify(json.users));
-    fs.writeFileSync('./user/db/votes.json', JSON.stringify(json.votes));
-}
-
-app.get('/dashboard', async (req, res) => {
-    logRoute(req, res)
-    let key = ""
-    if (req.cookies['chatbot']) {
-        key = req.cookies['chatbot']
-        let real = await db.findUserIdFromToken(req.cookies['chatbot']);
-        if (!real) {
-            res.clearCookie('chatbot');
-            res.redirect('/dashboard')
+    let sort = req.query.type
+    if (req.query.sort) {
+        sort = req.query.sort
+        if (sort == "gain") {
+            if (req.query.sortType && req.query.sortTime) { } else {
+                res.send('Error')
+                return;
+            }
         }
     }
-    let settings = await db.getOne('settings')
-    if (settings == {}) {
-        restoreLastBackup()
-    }
-    let userAuth = await db.findUserIdFromToken(req.cookies['chatbot']);
-    let commands = await db.getOne('commands')
-    let connection = await db.getOne('connection')
-    let counting = await db.getOne('counting')
-    let giveaway = await db.getOne('giveaway')
-    let messages = await db.getOne('messages')
-    let moderation = await db.getOne('moderation')
-    let quotes = await db.getOne('quotes')
-    let stream = await db.getOne('stream')
-    let timers = await db.getOne('timers')
-    let users = await db.getOne('users')
-    let votes = await db.getOne('votes')
-    let user = {
-        id: connection.channel.id,
-        commands: commands,
-        connection: connection,
-        counting: counting,
-        giveaway: giveaway,
-        messages: messages,
-        moderation: moderation,
-        quotes: quotes,
-        settings: settings,
-        stream: stream,
-        timers: timers,
-        users: users,
-        votes: votes
-    }
-    let auth = false;
-    if (userAuth) {
-        auth = true;
-    }
-    res.render(__dirname + '/web/dashboard.ejs', { user: user, stringify: stringify, relativeTime: relativeTime, auth: auth, res: res, key: key });
-});
-
-app.post('/addCommand', async (req, res) => {
-    logRoute(req, res)
-    if (req.cookies['chatbot']) {
-        let commands = await db.getOne('commands')
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
-            if (req.body.name && req.body.response && req.body.rank && req.body.cooldown) {
-                if (req.body.name.includes(' ')) {
-                    res.status(400).send({
-                        error: 'Command name cannot contain spaces',
-                        success: false
-                    });
-                    return;
+    if ((req.query.type == "users") || (req.query.type == "gain") || (req.query.type == "points")) {
+        let users = await await db.getOne('users')
+        if (users) {
+            let things = [...users];
+            if (things) {
+                if (sort == "verified") {
+                    sort = "isVerified"
+                } else if (sort == "moderator") {
+                    sort = "isModerator"
+                } else if (sort == "owner") {
+                    sort = "isOwner"
+                } else if (sort == "lastmsg") {
+                    sort = "lastMSG"
                 }
-                for (let i = 0; i < commands.length; i++) {
-                    if (commands[i].command == req.body.name) {
-                        res.status(400).send({
-                            error: 'Command already exists',
-                            success: false
+                if (sort == "points" || sort == "messages" || sort == "hours" || sort == "lastMSG" || sort == "xp") {
+                    if (sort == "lastMSG") {
+                        things.sort((a, b) => {
+                            return parseFloat(b["lastMSG"]) - parseFloat(a["lastMSG"])
                         });
-                        return;
+                    } else {
+                        things.sort((a, b) => {
+                            return parseFloat(b[sort]) - parseFloat(a[sort])
+                        });
                     }
+                } else if (sort == "isVerified" || sort == "isModerator" || sort == "isOwner") {
+                    things.sort((a, b) => {
+                        return b[sort] - a[sort]
+                    })
                 }
-                let randomStr8 = Math.random().toString(36).substring(7);
-                redo()
-                async function redo() {
-                    for (let i = 0; i < commands.length; i++) {
-                        if (commands[i].id == randomStr8) {
-                            randomStr8 = Math.random().toString(36).substring(7);
-                            redo()
+                if (sort == "gain") {
+                    for (let i = 0; i < things.length; i++) {
+                        let gain = things[i][req.query.sortType];
+                        if (Object.keys(things[i].dailyStats).length > parseFloat(req.query.sortTime)) {
+                            let keys = Object.keys(things[i].dailyStats);
+                            gain = parseFloat(things[i].dailyStats[keys[keys.length - 1]][req.query.sortType]) - parseFloat(things[i].dailyStats[keys[keys.length - (parseFloat(req.query.sortTime) + 1)]][req.query.sortType])
+                            things[i].gain = gain;
+                            if ((new Date() * 1000) - parseFloat(things[i].lastMSG) > (parseFloat(req.query.sortTime) * 86400000000)) {
+                                things[i].gain = 0;
+                            }
+                        } else {
+                            things[i].gain = gain;
                         }
                     }
+                    things.sort((a, b) => parseFloat(b['gain']) - parseFloat(a['gain']));
                 }
-                let cmd = {
-                    command: req.body.name,
-                    response: req.body.response,
-                    permission: req.body.rank,
-                    cooldown: parseFloat(req.body.cooldown),
-                    default: false,
-                    used: 0,
-                    id: randomStr8
-                };
-                if ((Child != undefined) && (Child != "")) {
-                    Child.send('updateAddCommand' + JSON.stringify(cmd));
-                } else {
-                    db.addObject('commands', cmd);
+                things = things.slice(parseInt(req.query.min), parseInt(req.query.max));
+                if (!req.query.lol) {
+                    for (let i = 0; i < things.length; i++) {
+                        delete things[i].cooldown
+                        delete things[i].dailyStats
+                        delete things[i].hourlyStats
+                        things[i].warns = things[i].warnings ? things[i].warnings : []
+                        things[i].warnings = things[i].warnings ? things[i].warnings.length : 0
+                    }
                 }
-                res.status(200).send({
-                    success: true
-                });
+                res.send(things)
             } else {
-                res.status(400).send({
-                    error: 'Missing command, response, permission or cooldown',
-                    success: false
-                });
+                res.send('Error')
             }
         } else {
-            res.status(401).send({
-                error: 'Unauthorized',
-                success: false
-            });
+            res.send('Error')
         }
-    } else {
-        res.status(401).send({
-            error: 'Unauthorized',
-            success: false
+    } else if (req.query.type == "votes") {
+        let votes = await await db.getOne('votes')
+        votes = votes.sort((a, b) => {
+            return parseFloat(b.votes) - parseFloat(a.votes)
         });
+        if (votes) {
+            let things = [...votes];
+            if (things) {
+                things.sort((a, b) => {
+                    return parseFloat(b.count) - parseFloat(a.count)
+                });
+                things = things.slice(parseInt(req.query.min), parseInt(req.query.max));
+                res.send(things)
+            } else {
+                res.send('Error')
+            }
+        } else {
+            res.send('Error')
+        }
     }
 });
 
-app.post('/addTimer', async (req, res) => {
+//maybe change route
+app.post('/api/view/search', async (req, res) => {
     logRoute(req, res)
-    if (req.cookies['chatbot']) {
-        let timers = await db.getOne('timers')
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
-            if (req.body.text && req.body.interval) {
-                if (isNaN(parseFloat(req.body.interval))) {
-                    res.status(400).send({
-                        error: 'Interval must be a number',
-                        success: false
-                    });
-                    return;
-                }
-                if (parseFloat(req.body.interval) < 120) {
-                    res.status(400).send({
-                        error: 'Interval must be at least 120 seconds',
-                        success: false
-                    });
-                    return;
-                }
-                let randomStr8 = Math.random().toString(36).substring(7);
-                redo()
-                async function redo() {
-                    for (let i = 0; i < timers.length; i++) {
-                        if (timers[i].id == randomStr8) {
-                            randomStr8 = Math.random().toString(36).substring(7);
-                            redo()
-                        }
-                    }
-                }
-                db.addObject('timers', {
-                    text: req.body.text,
-                    interval: parseFloat(req.body.interval),
-                    lastCalled: 0,
-                    enabled: true,
-                    id: randomStr8
-                });
-                res.status(200).send({
-                    success: true
-                });
-            } else {
-                res.status(400).send({
-                    error: 'Missing text or interval',
-                    success: false
-                });
-            }
-        } else {
-            res.status(401).send({
-                error: 'Unauthorized',
-                success: false
-            });
+    if (req.body.search == undefined) return res.send('Error' + req.body.search)
+    let users = await await db.getOne('users')
+    if (users) {
+        let things = [...users];
+        let query = req.body.search.toLowerCase();
+        let results = things.filter(x => x.name.toLowerCase().includes(query) || x.id.toLowerCase().includes(query));
+        results = results.slice(parseInt(req.query.min), parseInt(req.query.max));
+        for (let i = 0; i < results.length; i++) {
+            delete results[i].cooldown
+            delete results[i].dailyStats
+            delete results[i].hourlyStats
+            results[i].warns = results[i].warnings ? results[i].warnings : []
+            results[i].warnings = results[i].warnings ? results[i].warnings.length : 0
         }
+        res.send(results)
     } else {
-        res.status(401).send({
-            error: 'Unauthorized',
-            success: false
-        });
+        res.send('Error')
     }
 });
 
-app.post('/editTimer', async (req, res) => {
+
+/*---------------/api/edit/-----------------*/
+app.post('/api/edit/giveaway', async (req, res) => {
+    logRoute(req, res)
+    if (req.body.prize && req.body.entryRank && req.body.requirementAmount && req.body.requirementType && req.body.command) {
+        if (req.cookies['chatbot']) {
+            if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await await db.getOne('giveaway')
+                let giveaway = {
+                    enabled: currentGiveaway.enabled,
+                    winner: currentGiveaway.winner,
+                    prize: req.body.prize,
+                    entries: currentGiveaway.entries,
+                    entryRank: req.body.entryRank,
+                    requirementAmount: req.body.requirementAmount,
+                    requirementType: req.body.requirementType,
+                    command: req.body.command
+                }
+                await db.overwriteOne('giveaway', giveaway)
+                res.send({ success: true })
+            } else {
+                res.send('Unauthorized')
+            }
+        } else {
+            res.send('Unauthorized')
+        }
+    } else if (req.body.clear) {
+        if (req.cookies['chatbot']) {
+            if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await await db.getOne('giveaway')
+                currentGiveaway.entries = [];
+                currentGiveaway.winner = '';
+                currentGiveaway.enabled = false;
+                await db.overwriteOne('giveaway', currentGiveaway)
+                res.send({ success: true })
+            } else {
+                res.send('Unauthorized')
+            }
+        }
+    } else if (req.body.reroll) {
+        if (req.cookies['chatbot']) {
+            if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await await db.getOne('giveaway')
+                currentGiveaway.winner = '';
+                let winner = currentGiveaway.entries[Math.floor(Math.random() * currentGiveaway.entries.length)];
+                currentGiveaway.winner = winner;
+                await db.overwriteOne('giveaway', currentGiveaway)
+                res.send({ success: true })
+            } else {
+                res.send('Unauthorized')
+            }
+        }
+    } else if (req.body.start) {
+        if (req.cookies['chatbot']) {
+            let currentGiveaway = await await db.getOne('giveaway')
+            if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                currentGiveaway.enabled = true;
+                await db.overwriteOne('giveaway', currentGiveaway)
+                res.send({ success: true })
+            } else {
+                res.send('Unauthorized')
+            }
+        }
+    } else if (req.body.stop) {
+        if (req.cookies['chatbot']) {
+            if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await await db.getOne('giveaway')
+                currentGiveaway.enabled = false;
+                let winner = currentGiveaway.entries[Math.floor(Math.random() * currentGiveaway.entries.length)];
+                currentGiveaway.winner = winner;
+                await db.overwriteOne('giveaway', currentGiveaway)
+                res.send({ success: true })
+            } else {
+                res.send('Unauthorized')
+            }
+        }
+    } else {
+        res.send('Error')
+    }
+});
+
+app.post('/api/edit/timer', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let timers = await db.getOne('timers')
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let timers = await await db.getOne('timers')
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.id && req.body.text && req.body.interval && req.body.enabled) {
                 if (isNaN(parseFloat(req.body.interval))) {
                     res.status(400).send({
@@ -546,8 +381,8 @@ app.post('/editTimer', async (req, res) => {
                 }
                 for (let i = 0; i < timers.length; i++) {
                     if (timers[i].id == req.body.id) {
-                        db.removeObject('timers', 'id', req.body.id);
-                        db.addObject('timers', {
+                        await db.removeObject('timers', 'id', req.body.id);
+                        await db.addTo('timers', {
                             text: req.body.text,
                             interval: parseFloat(req.body.interval),
                             lastCalled: 0,
@@ -584,15 +419,144 @@ app.post('/editTimer', async (req, res) => {
     }
 });
 
-app.post('/removeTimer', async (req, res) => {
+app.post('/api/edit/command', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let timers = await db.getOne('timers')
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let commands = await await db.getOne('commands')
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+            if (req.body.name && req.body.response && req.body.rank && req.body.cooldown) {
+                if (req.body.name.includes(' ')) {
+                    res.status(400).send({
+                        error: 'Command name cannot contain spaces',
+                        success: false
+                    });
+                    return;
+                }
+                for (let i = 0; i < commands.length; i++) {
+                    if (commands[i].command == req.body.name) {
+                        let cmd = {
+                            command: req.body.name,
+                            response: req.body.response,
+                            permission: req.body.rank,
+                            cooldown: parseFloat(req.body.cooldown),
+                            default: false,
+                            used: (parseFloat(commands[i].used) + 1),
+                            id: commands[i].id
+                        }
+                        await db.overwriteObjectInArray('commands', 'id', commands[i].id, cmd);
+                        res.status(200).send({
+                            success: true
+                        });
+                        return;
+                    }
+                }
+                res.status(400).send({
+                    error: 'Command does not exist',
+                    success: false
+                });
+            } else {
+                if (req.body.id && req.body.used) {
+                    for (let i = 0; i < commands.length; i++) {
+                        if (commands[i].id == req.body.id) {
+                            let cmd = {
+                                response: commands[i].response,
+                                permission: commands[i].permission,
+                                cooldown: commands[i].cooldown,
+                                default: commands[i].default,
+                                used: parseFloat(req.body.used),
+                                id: commands[i].id
+                            };
+                            await db.overwriteObjectInArray('commands', 'id', commands[i].id, cmd);
+                            res.status(200).send({
+                                success: true
+                            });
+                        }
+                    }
+                } else {
+                    res.status(400).send({
+                        error: 'Missing command, response, permission or cooldown',
+                        success: false
+                    });
+                }
+            }
+        } else {
+            res.status(401).send({
+                error: 'Unauthorized',
+                success: false
+            });
+        }
+    } else {
+        res.status(401).send({
+            error: 'Unauthorized',
+            success: false
+        });
+    }
+});
+
+app.post('/api/edit/user', async (req, res) => {
+    logRoute(req, res)
+    if (req.cookies['chatbot']) {
+        let users = currency
+        let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
+        if (userID) {
+            let subject = users.find(x => x.id == req.body.id);
+            if (subject) {
+                if (req.body.type == 'warnings') {
+                    await db.editWithinArray('users', 'id', req.body.id, 'warns', [])
+                    await db.editWithinArray('users', 'id', req.body.id, 'allWarns', [])
+                } else {
+                    await db.editWithinArray('users', 'id', req.body.id, req.body.type, req.body.value);
+                }
+                res.status(200).send({
+                    success: true
+                });
+            } else {
+                res.status(400).send({
+                    error: 'User not found',
+                    success: false
+                });
+            }
+        } else {
+            res.status(400).send({
+                error: 'Invalid token',
+                success: false
+            });
+        }
+    } else {
+        res.status(400).send({
+            error: 'Invalid token',
+            success: false
+        });
+    }
+});
+
+
+/*---------------/api/remove/-----------------*/
+app.post('/api/remove/user', async (req, res) => {
+    logRoute(req, res)
+    if (req.body.id == undefined) return res.send('Error')
+    if (req.cookies['chatbot']) {
+        let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
+        if (userID) {
+            await db.deleteFromArray('users', 'id', req.body.id)
+            res.send({ success: true })
+        } else {
+            res.send('Error')
+        }
+    } else {
+        res.send('Unauthorized')
+    }
+});
+
+app.post('/api/remove/timer', async (req, res) => {
+    logRoute(req, res)
+    if (req.cookies['chatbot']) {
+        let timers = await await db.getOne('timers')
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.id) {
                 for (let i = 0; i < timers.length; i++) {
                     if (timers[i].id == req.body.id) {
-                        db.removeObject('timers', 'id', req.body.id);
+                        await db.removeObject('timers', 'id', req.body.id);
                         res.status(200).send({
                             success: true
                         });
@@ -623,19 +587,15 @@ app.post('/removeTimer', async (req, res) => {
     }
 });
 
-app.post('/removeCommand', async (req, res) => {
+app.post('/api/remove/command', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let commands = await db.getOne('commands')
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let commands = await await db.getOne('commands')
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.name) {
                 for (let i = 0; i < commands.length; i++) {
                     if (commands[i].command == req.body.name) {
-                        if ((Child != undefined) && (Child != "")) {
-                            Child.send('updateRemoveCommand' + commands[i].id);
-                        } else {
-                            db.removeObject('commands', 'id', commands[i].id);
-                        }
+                        await db.removeObject('commands', 'id', commands[i].id);
                         res.status(200).send({
                             success: true
                         });
@@ -666,73 +626,54 @@ app.post('/removeCommand', async (req, res) => {
     }
 });
 
-app.post('/editCommand', async (req, res) => {
+
+/*---------------/api/add/-----------------*/
+
+app.post('/api/add/timer', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let commands = await db.getOne('commands')
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
-            if (req.body.name && req.body.response && req.body.rank && req.body.cooldown) {
-                if (req.body.name.includes(' ')) {
+        let timers = await await db.getOne('timers')
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+            if (req.body.text && req.body.interval) {
+                if (isNaN(parseFloat(req.body.interval))) {
                     res.status(400).send({
-                        error: 'Command name cannot contain spaces',
+                        error: 'Interval must be a number',
                         success: false
                     });
                     return;
                 }
-                for (let i = 0; i < commands.length; i++) {
-                    if (commands[i].command == req.body.name) {
-                        let cmd = {
-                            command: req.body.name,
-                            response: req.body.response,
-                            permission: req.body.rank,
-                            cooldown: parseFloat(req.body.cooldown),
-                            default: false,
-                            used: (parseFloat(commands[i].used) + 1),
-                            id: commands[i].id
-                        }
-                        if ((Child != undefined) && (Child != "")) {
-                            Child.send('updateEditCommand' + commands[i].id + "___" + JSON.stringify(cmd));
-                        } else {
-                            db.overwriteObjectInArray('commands', 'id', commands[i].id, cmd);
-                        }
-                        res.status(200).send({
-                            success: true
-                        });
-                        return;
-                    }
-                }
-                res.status(400).send({
-                    error: 'Command does not exist',
-                    success: false
-                });
-            } else {
-                if (req.body.id && req.body.used) {
-                    for (let i = 0; i < commands.length; i++) {
-                        if (commands[i].id == req.body.id) {
-                            let cmd = {
-                                response: commands[i].response,
-                                permission: commands[i].permission,
-                                cooldown: commands[i].cooldown,
-                                default: commands[i].default,
-                                used: parseFloat(req.body.used),
-                                id: commands[i].id
-                            };
-                            if ((Child != undefined) && (Child != "")) {
-                                Child.send('updateEditCommand' + commands[i].id + "___" + JSON.stringify(cmd));
-                            } else {
-                                db.overwriteObjectInArray('commands', 'id', commands[i].id, cmd);
-                            }
-                            res.status(200).send({
-                                success: true
-                            });
-                        }
-                    }
-                } else {
+                if (parseFloat(req.body.interval) < 120) {
                     res.status(400).send({
-                        error: 'Missing command, response, permission or cooldown',
+                        error: 'Interval must be at least 120 seconds',
                         success: false
                     });
+                    return;
                 }
+                let randomStr8 = Math.random().toString(36).substring(7);
+                redo()
+                async function redo() {
+                    for (let i = 0; i < timers.length; i++) {
+                        if (timers[i].id == randomStr8) {
+                            randomStr8 = Math.random().toString(36).substring(7);
+                            redo()
+                        }
+                    }
+                }
+                await db.addTo('timers', {
+                    text: req.body.text,
+                    interval: parseFloat(req.body.interval),
+                    lastCalled: 0,
+                    enabled: true,
+                    id: randomStr8
+                });
+                res.status(200).send({
+                    success: true
+                });
+            } else {
+                res.status(400).send({
+                    error: 'Missing text or interval',
+                    success: false
+                });
             }
         } else {
             res.status(401).send({
@@ -748,42 +689,152 @@ app.post('/editCommand', async (req, res) => {
     }
 });
 
-let chat = await db.getOne('messages')
-setInterval(async () => {
-    chat = await db.getOne('messages')
-}, 5000)
-app.get('/chat', async (req, res) => {
+app.post('/api/add/command', async (req, res) => {
     logRoute(req, res)
-    try {
-        let messages = chat;
-        if (messages) {
-            messages = [...messages]
-            messages = messages.sort((a, b) => {
-                return parseFloat(a.timestampUsec) - parseFloat(b.timestampUsec);
-            });
-            res.status(200).send({
-                messages: messages.slice(-25),
-                success: true
-            });
+    if (req.cookies['chatbot']) {
+        let commands = await await db.getOne('commands')
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+            if (req.body.name && req.body.response && req.body.rank && req.body.cooldown) {
+                if (req.body.name.includes(' ')) {
+                    res.status(400).send({
+                        error: 'Command name cannot contain spaces',
+                        success: false
+                    });
+                    return;
+                }
+                for (let i = 0; i < commands.length; i++) {
+                    if (commands[i].command == req.body.name) {
+                        res.status(400).send({
+                            error: 'Command already exists',
+                            success: false
+                        });
+                        return;
+                    }
+                }
+                let randomStr8 = Math.random().toString(36).substring(7);
+                redo()
+                async function redo() {
+                    for (let i = 0; i < commands.length; i++) {
+                        if (commands[i].id == randomStr8) {
+                            randomStr8 = Math.random().toString(36).substring(7);
+                            redo()
+                        }
+                    }
+                }
+                let cmd = {
+                    command: req.body.name,
+                    response: req.body.response,
+                    permission: req.body.rank,
+                    cooldown: parseFloat(req.body.cooldown),
+                    default: false,
+                    used: 0,
+                    id: randomStr8
+                };
+                await db.addTo('commands', cmd);
+                res.status(200).send({
+                    success: true
+                });
+            } else {
+                res.status(400).send({
+                    error: 'Missing command, response, permission or cooldown',
+                    success: false
+                });
+            }
         } else {
             res.status(401).send({
-                error: 'unknown error',
+                error: 'Unauthorized',
                 success: false
             });
         }
-    } catch (e) {
-        console.log(e)
-        res.status(404).send({
-            error: 'Not found',
+    } else {
+        res.status(401).send({
+            error: 'Unauthorized',
             success: false
         });
     }
 });
 
+
+/*---------------/file/-----------------*/
+app.get('/file/countup.js', async (req, res) => {
+    logRoute(req, res)
+    res.sendFile(__dirname + '/web/countup.js');
+});
+
+app.get('/file/odometer.js', async (req, res) => {
+    logRoute(req, res)
+    res.sendFile(__dirname + '/web/odometer.js');
+});
+
+app.get('/file/odometer.css', async (req, res) => {
+    logRoute(req, res)
+    res.sendFile(__dirname + '/web/odometer.css');
+});
+
+
+/*---------------/main/-----------------*/
+app.get('/', async (req, res) => {
+    logRoute(req, res)
+    res.sendFile(__dirname + '/web/index.html');
+});
+
+app.get('/dashboard', async (req, res) => {
+    logRoute(req, res)
+    let key = ""
+    if (req.cookies['chatbot']) {
+        key = req.cookies['chatbot']
+        let real = await await db.findUserIdFromToken(req.cookies['chatbot']);
+        if (!real) {
+            res.clearCookie('chatbot');
+            res.redirect('/dashboard')
+        }
+    }
+    let settings = await await db.getOne('settings')
+    if (settings == undefined) {
+        res.redirect('/connect')
+        return;
+    }
+    if (settings == {}) {
+        restoreLastBackup()
+    }
+    let userAuth = await await db.findUserIdFromToken(req.cookies['chatbot']);
+    let commands = await await db.getOne('commands')
+    let connection = await await db.getOne('connection')
+    let counting = await await db.getOne('counting')
+    let giveaway = await await db.getOne('giveaway')
+    let messages = await await db.getOne('messages')
+    let moderation = await await db.getOne('moderation')
+    let quotes = await await db.getOne('quotes')
+    let stream = await await db.getOne('stream')
+    let timers = await await db.getOne('timers')
+    let users = await await db.getOne('users')
+    let votes = await await db.getOne('votes')
+    let user = {
+        id: connection.channel.id,
+        commands: commands,
+        connection: connection,
+        counting: counting,
+        giveaway: giveaway,
+        messages: messages,
+        moderation: moderation,
+        quotes: quotes,
+        settings: settings,
+        stream: stream,
+        timers: timers,
+        users: users,
+        votes: votes
+    }
+    let auth = false;
+    if (userAuth) {
+        auth = true;
+    }
+    res.render(__dirname + '/web/dashboard.ejs', { user: user, stringify: stringify, relativeTime: relativeTime, auth: auth, res: res, key: key });
+});
+
 app.get('/connect', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
         if (userID) {
             res.redirect('/restore')
         } else {
@@ -808,7 +859,7 @@ app.get('/login/:token', async (req, res) => {
 app.get('/restore', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
         if (userID) {
             let backups = fs.readdirSync('./user/archives');
             backups.sort(function (a, b) {
@@ -824,24 +875,19 @@ app.get('/restore', async (req, res) => {
     }
 });
 
+app.get('/favicon.ico', async (req, res) => {
+    logRoute(req, res)
+    res.sendFile(__dirname + '/web/favicon.ico');
+});
+
 app.post('/restore/:date', async (req, res) => {
     try {
         logRoute(req, res)
         if (req.cookies['chatbot']) {
-            let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
+            let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
             if (userID) {
                 let backups = fs.readdirSync('./user/archives');
                 if (backups.includes(req.params.date)) {
-                    let a = false;
-                    if ((Child != undefined) || (Child != "")) {
-                        try {
-                            Child.send('end');
-                            Child = "";
-                            a = true;
-                        } catch (e) {
-                            console.log(e)
-                        }
-                    }
                     let file = fs.readFileSync('./user/archives/' + req.params.date);
                     let json = JSON.parse(file);
                     fs.writeFileSync('./user/db/commands.json', JSON.stringify(json.commands));
@@ -857,9 +903,6 @@ app.post('/restore/:date', async (req, res) => {
                     fs.writeFileSync('./user/db/users.json', JSON.stringify(json.users));
                     fs.writeFileSync('./user/db/votes.json', JSON.stringify(json.votes));
                     res.send({ success: true })
-                    if (a) {
-                        checkLiveChannels()
-                    }
                 } else {
                     res.status(404).send({ error: 'Not found' })
                 }
@@ -1172,86 +1215,32 @@ app.get('/logout', async (req, res) => {
     res.redirect('/');
 });
 
-async function checkLiveChannels() {
-    try {
-        if (!fs.existsSync('./user/db')) return false;
-        let settings = JSON.parse(fs.readFileSync('./user/db/settings.json'));
-        if (settings && settings.chatbot) {
-            if (!settings.chatbot.enabled) {
-                return false;
-            }
-        }
-        let connection = JSON.parse(fs.readFileSync('./user/db/connection.json'));
-        let stream = JSON.parse(fs.readFileSync('./user/db/stream.json'));
-        if (connection.channel) {
-            function redoThing(already) {
-                if ((stream.id != "") && (stream.id != undefined) && (stream.id != null) && (stream.id.length > 0)) {
-                    if (already) {
-                        stream.id = "";
-                    }
-                }
-                getStream(connection.channel.id, stream.id).then((stream2) => {
-                    console.log(stream2)
-                    if (stream2.stream) {
-                        if ((Child == "") || (Child == undefined)) {
-                            let lcmessages = stream.messages;
-                            db.overwriteOne('stream', {
-                                id: stream2.stream.id,
-                                title: stream2.stream.title,
-                                thumbnail: 'https://i.ytimg.com/vi/' + stream2.stream.id + '/hqdefault.jpg',
-                                live: true,
-                                messages: lcmessages,
-                                viewers: stream2.stream.viewers
-                            });
-                            Child = fork('chatbot.js', [connection.channel.id, stream2.stream.id, connection.bot.id]);
-                            Child.send('Hello from the parent!');
-                            Child.on('exit', (code, signal) => {
-                                console.log(`Child process exited with code ${code} and signal ${signal}`);
-                                Child = ""
-                                checkLiveChannels();
-                            });
-                            Child.on('error', (err) => {
-                                console.log(err);
-                            })
-                        } else {
-                            db.overwriteOne('stream', {
-                                id: stream2.stream.id,
-                                title: stream2.stream.title,
-                                thumbnail: 'https://i.ytimg.com/vi/' + stream2.stream.id + '/hqdefault.jpg',
-                                live: true,
-                                messages: stream.messages,
-                                viewers: stream2.stream.viewers
-                            });
-                        }
-                    } else {
-                        if (!already) {
-                            redoThing(true);
-                        } else {
-                            if (stream.live) {
-                                console.log('stream ended')
-                                stream.live = false;
-                                db.overwriteOne('stream', stream);
-                                if ((Child != "") && (Child != undefined)) {
-                                    Child.send('end');
-                                    Child = "";
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-            redoThing(false);
-        }
-    } catch (err) {
-        console.log(err);
-    }
-}
-
-app.post('/deleteMsg', async (req, res) => {
+app.post('/api/checkforstream', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let stream = await db.getOne('stream');
-        if (db.findUserIdFromToken(req.cookies['chatbot'])) {
+        console.log('has cookies')
+        let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
+        if (userID) {
+            console.log('is logged in')
+            endStream()
+            res.send({ success: true })
+        } else {
+            res.send('Error')
+            console.log('is not logged in')
+        }
+    } else {
+        res.send('Error')
+        console.log('has no cookies')
+    }
+});
+
+
+/*---------------/api/chat/-----------------*/
+app.post('/api/chat/deleteMsg', async (req, res) => {
+    logRoute(req, res)
+    if (req.cookies['chatbot']) {
+        let stream = await await db.getOne('stream');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             let index = livechats.findIndex((stream2) => {
                 return stream2 == stream.id;
             });
@@ -1281,11 +1270,11 @@ app.post('/deleteMsg', async (req, res) => {
     }
 });
 
-app.post('/timeout', async (req, res) => {
+app.post('/api/chat/timeout', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let stream = await db.getOne('stream');
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let stream = await await db.getOne('stream');
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
             let index = livechats.findIndex((stream2) => {
                 return stream2 == stream.id;
             });
@@ -1307,11 +1296,11 @@ app.post('/timeout', async (req, res) => {
     }
 });
 
-app.post('/ban', async (req, res) => {
+app.post('/api/chat/ban', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let stream = await db.getOne('stream');
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let stream = await await db.getOne('stream');
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
             let index = livechats.findIndex((stream2) => {
                 return stream2 == stream.id;
             });
@@ -1333,50 +1322,15 @@ app.post('/ban', async (req, res) => {
     }
 });
 
-app.post('/updateUser', async (req, res) => {
-    logRoute(req, res)
-    if (req.cookies['chatbot']) {
-        let users = await db.getOne('users');
-        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
-        if (userID) {
-            let subject = users.find(x => x.id == req.body.id);
-            if (subject) {
-                if (req.body.type == 'warnings') {
-                    db.editWithinArray('users', 'id', req.body.id, 'warns', [])
-                    db.editWithinArray('users', 'id', req.body.id, 'allWarns', [])
-                } else {
-                    db.editWithinArray('users', 'id', req.body.id, req.body.type, req.body.value);
-                }
-                res.status(200).send({
-                    success: true
-                });
-            } else {
-                res.status(400).send({
-                    error: 'User not found',
-                    success: false
-                });
-            }
-        } else {
-            res.status(400).send({
-                error: 'Invalid token',
-                success: false
-            });
-        }
-    } else {
-        res.status(400).send({
-            error: 'Invalid token',
-            success: false
-        });
-    }
-});
 
-app.post('/settings/moderation', async (req, res) => {
+/*---------------/api/settings/-----------------*/
+app.post('/api/settings/moderation', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let moderation = await db.getOne('moderation');
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let moderation = await await db.getOne('moderation');
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
             moderation = req.body.moderation;
-            db.overwriteOne('moderation', moderation);
+            await db.overwriteOne('moderation', moderation);
             res.status(200).send({
                 success: true
             });
@@ -1394,65 +1348,15 @@ app.post('/settings/moderation', async (req, res) => {
     }
 })
 
-function relativeTime(previous) {
-    if (previous === 0) {
-        return "never"
-    }
-    previous = parseInt(previous) / 1000;
-    const date = new Date();
-    const timestamp = date.getTime();
-    previous = Math.floor(previous / 1000)
-    const difference = Math.floor(timestamp / 1000) - previous;
-    let output = ``;
-    if (difference < 60) {
-        if (difference === 1) {
-            output = `${difference} second ago`;
-        } else {
-            output = `${difference} seconds ago`;
-        }
-    } else if (difference < 3600) {
-        if (difference === 1) {
-            output = `${Math.floor(difference / 60)} minute ago`;
-        } else {
-            output = `${Math.floor(difference / 60)} minutes ago`;
-        }
-    } else if (difference < 86400) {
-        if (difference === 1) {
-            output = `${Math.floor(difference / 3600)} hour ago`;
-        } else {
-            output = `${Math.floor(difference / 3600)} hours ago`;
-        }
-    } else if (difference < 2620800) {
-        if (difference === 1) {
-            output = `${Math.floor(difference / 86400)} day ago`;
-        } else {
-            output = `${Math.floor(difference / 86400)} days ago`;
-        }
-    } else if (difference < 31449600) {
-        if (difference === 1) {
-            output = `${Math.floor(difference / 2620800)} month ago`;
-        } else {
-            output = `${Math.floor(difference / 2620800)} months ago`;
-        }
-    } else {
-        if (difference === 1) {
-            output = `${Math.floor(difference / 31449600)} year ago`;
-        } else {
-            output = `${Math.floor(difference / 31449600)} years ago`;
-        }
-    }
-    return output;
-}
-
-app.get('/settings/enable', async (req, res) => {
+app.get('/api/settings/enable', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let settings = await db.getOne('settings');
-        let stream = await db.getOne('stream');
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let settings = await await db.getOne('settings');
+        let stream = await await db.getOne('stream');
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (settings.chatbot.enabled == false) {
                 settings.chatbot.enabled = true;
-                db.overwriteOne('settings', settings);
+                await db.overwriteOne('settings', settings);
                 getStream(stream.id)
                 res.status(200).send({
                     success: true,
@@ -1460,11 +1364,7 @@ app.get('/settings/enable', async (req, res) => {
                 });
             } else {
                 settings.chatbot.enabled = false;
-                db.overwriteOne('settings', settings);
-                if ((Child != undefined) && (Child != "")) {
-                    Child.send('end');
-                    Child = "";
-                }
+                await db.overwriteOne('settings', settings);
                 res.status(200).send({
                     success: true,
                     enabled: 'disabled'
@@ -1484,9 +1384,72 @@ app.get('/settings/enable', async (req, res) => {
     }
 });
 
+app.get('/api/settings/counting', async (req, res) => {
+    logRoute(req, res)
+    if (req.cookies['chatbot']) {
+        let settings = await await db.getOne('settings');
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+            if (settings.counting.enabled) {
+                settings.counting.enabled = false;
+                await db.overwriteOne('settings', settings);
+                res.status(200).send({
+                    success: true,
+                    enabled: 'disabled'
+                });
+            } else {
+                settings.counting.enabled = true;
+                await db.overwriteOne('settings', settings);
+                res.status(200).send({
+                    success: true,
+                    enabled: 'enabled'
+                });
+            }
+        } else {
+            res.status(400).send({
+                error: 'Invalid token',
+                success: false
+            });
+        }
+    } else {
+        res.status(400).send({
+            error: 'Invalid token',
+            success: false
+        });
+    }
+});
+
+app.get('/api/settings/currency', async (req, res) => {
+    logRoute(req, res)
+    if (req.cookies['chatbot']) {
+        let settings = await await db.getOne('settings');
+        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+            if (settings.currency.enabled) {
+                settings.currency.enabled = false;
+                await db.overwriteOne('settings', settings);
+                res.status(200).send({
+                    success: true,
+                    enabled: 'disabled'
+                });
+            } else {
+                settings.currency.enabled = true;
+                await db.overWriteOne('settings', settings);
+                res.status(200).send({
+                    success: true,
+                    enabled: 'enabled'
+                });
+            }
+        } else {
+            res.status(400).send({
+                error: 'Invalid token',
+                success: false
+            });
+        }
+    }
+});
+
 app.get('/filestore/:file', async (req, res) => {
     logRoute(req, res)
-    if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+    if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
         let userDir = "./user/files"
         let file = req.params.file;
         let path = userDir + "/" + file;
@@ -1506,69 +1469,8 @@ app.get('/filestore/:file', async (req, res) => {
     }
 })
 
-app.get('/counting/enable', async (req, res) => {
-    logRoute(req, res)
-    if (req.cookies['chatbot']) {
-        let settings = await db.getOne('settings');
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
-            if (settings.counting.enabled) {
-                settings.counting.enabled = false;
-                db.overwriteOne('settings', settings);
-                res.status(200).send({
-                    success: true,
-                    enabled: 'disabled'
-                });
-            } else {
-                settings.counting.enabled = true;
-                db.overwriteOne('settings', settings);
-                res.status(200).send({
-                    success: true,
-                    enabled: 'enabled'
-                });
-            }
-        } else {
-            res.status(400).send({
-                error: 'Invalid token',
-                success: false
-            });
-        }
-    } else {
-        res.status(400).send({
-            error: 'Invalid token',
-            success: false
-        });
-    }
-});
 
-app.get('/currency/enable', async (req, res) => {
-    logRoute(req, res)
-    if (req.cookies['chatbot']) {
-        let settings = await db.getOne('settings');
-        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
-            if (settings.currency.enabled) {
-                settings.currency.enabled = false;
-                db.overwriteOne('settings', settings);
-                res.status(200).send({
-                    success: true,
-                    enabled: 'disabled'
-                });
-            } else {
-                settings.currency.enabled = true;
-                db.overWriteOne('settings', settings);
-                res.status(200).send({
-                    success: true,
-                    enabled: 'enabled'
-                });
-            }
-        } else {
-            res.status(400).send({
-                error: 'Invalid token',
-                success: false
-            });
-        }
-    }
-});
-
+/*---------------/public/-----------------*/
 app.get('/public/live/chat/:id', async (req, res) => {
     logRoute(req, res)
     let dir = './user/db/messages.json';
@@ -1587,7 +1489,6 @@ app.get('/public/live/chat/:id', async (req, res) => {
     }
 });
 
-let currency;
 app.get('/public/currency', async (req, res) => {
     logRoute(req, res)
     res.render(__dirname + '/web/public.ejs');
@@ -1616,7 +1517,7 @@ app.get('/public/compare', async (req, res) => {
         });
         return;
     }
-    let users = JSON.parse(fs.readFileSync('./user/db/users.json'));
+    let users = currency
     let user1Data = users.find(x => x.id == user1);
     let user2Data = users.find(x => x.id == user2);
     let dailyKeys1 = Object.keys(user1Data.dailyStats);
@@ -1761,93 +1662,94 @@ app.get('/public/compare', async (req, res) => {
 app.get('/public/currency/user', async (req, res) => {
     logRoute(req, res)
     try {
-        let dir = './user/db/users.json';
-        if (fs.existsSync(dir)) {
-            if (req.query.id) {
-                let users = JSON.parse(fs.readFileSync(dir));
-                let user = users.find(x => x.id == req.query.id);
-                let dailyKeys = Object.keys(user.dailyStats);
-                try {
+        if (req.query.id) {
+            let users = currency
+            let user = users.find(x => x.id == req.query.id);
+            if (!user.dailyStats) {
+                user.dailyStats = {};
+                user.dailyStats[`${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`] = {
+                    messages: user.messages,
+                    points: user.points,
+                    xp: user.xp
+                }
+                db.editWithinArray('users', user.id, 'dailyStats', user.dailyStats);
+            }
+            let dailyKeys = Object.keys(user.dailyStats);
+            try {
+                user.daily = {
+                    points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].points),
+                    messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].messages),
+                    xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].xp)
+                }
+            } catch (err) {
+                user.daily = {
+                    points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
+                    messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
+                    xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
+                }
+            }
+            try {
+                user.weekly = {
+                    points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].points),
+                    messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].messages),
+                    xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].xp)
+                }
+            } catch (err) {
+                user.weekly = {
+                    points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
+                    messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
+                    xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
+                }
+            }
+            try {
+                user.monthly = {
+                    points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].points),
+                    messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].messages),
+                    xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].xp)
+                }
+            } catch (err) {
+                user.monthly = {
+                    points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
+                    messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
+                    xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
+                }
+            }
+            if (user.lastMSG) {
+                if ((Date.now() * 1000) - (user.lastMSG) > 86400000000) {
                     user.daily = {
-                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].points),
-                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].messages),
-                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].xp)
-                    }
-                } catch (err) {
-                    user.daily = {
-                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
-                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
-                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
+                        points: 0,
+                        messages: 0,
+                        xp: 0
                     }
                 }
-                try {
+                if ((Date.now() * 1000) - (user.lastMSG) > 604800000000000) {
                     user.weekly = {
-                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].points),
-                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].messages),
-                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].xp)
-                    }
-                } catch (err) {
-                    user.weekly = {
-                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
-                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
-                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
+                        points: 0,
+                        messages: 0,
+                        xp: 0
                     }
                 }
-                try {
+                if ((Date.now() * 1000) - (user.lastMSG) > 2592000000000) {
                     user.monthly = {
-                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].points),
-                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].messages),
-                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].xp)
-                    }
-                } catch (err) {
-                    user.monthly = {
-                        points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
-                        messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
-                        xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
+                        points: 0,
+                        messages: 0,
+                        xp: 0
                     }
                 }
-                if (user.lastMSG) {
-                    if ((Date.now() * 1000) - (user.lastMSG) > 86400000000) {
-                        user.daily = {
-                            points: 0,
-                            messages: 0,
-                            xp: 0
-                        }
-                    }
-                    if ((Date.now() * 1000) - (user.lastMSG) > 604800000000000) {
-                        user.weekly = {
-                            points: 0,
-                            messages: 0,
-                            xp: 0
-                        }
-                    }
-                    if ((Date.now() * 1000) - (user.lastMSG) > 2592000000000) {
-                        user.monthly = {
-                            points: 0,
-                            messages: 0,
-                            xp: 0
-                        }
-                    }
-                }
-                if (user) {
-                    res.render(__dirname + '/web/user.ejs', {
-                        user: user
-                    });
-                } else {
-                    res.status(400).send({
-                        error: 'User not found',
-                        success: false
-                    });
-                }
+            }
+            if (user) {
+                res.render(__dirname + '/web/user.ejs', {
+                    user: user
+                });
             } else {
                 res.status(400).send({
-                    error: 'Missing id',
+                    error: 'User not found',
                     success: false
                 });
             }
         } else {
             res.status(400).send({
-                error: 'Channel not found',
+                error: 'Missing id',
                 success: false
             });
         }
@@ -1859,63 +1761,6 @@ app.get('/public/currency/user', async (req, res) => {
         });
     }
 });
-
-app.get('/favicon.ico', async (req, res) => {
-    logRoute(req, res)
-    res.sendFile(__dirname + '/web/favicon.ico');
-});
-
-function calculateDifference(dailyStats, key, daysAgo, currencyLength) {
-    try {
-        let toReturn = parseFloat(Object.values(dailyStats)[currencyLength - 1][key]) - parseFloat(Object.values(dailyStats)[currencyLength - daysAgo][key]);
-        if (isNaN(toReturn)) {
-            return 0;
-        } else {
-            return toReturn;
-        }
-    } catch (err) {
-        return 0;
-    }
-}
-
-function calculateDaily(user) {
-    user.daily = {
-        points: calculateDifference(user.dailyStats, 'points', 2, Object.keys(user.dailyStats).length),
-        messages: calculateDifference(user.dailyStats, 'messages', 2, Object.keys(user.dailyStats).length),
-        xp: calculateDifference(user.dailyStats, 'xp', 2, Object.keys(user.dailyStats).length),
-    };
-}
-
-function calculateWeekly(user) {
-    user.weekly = {
-        points: calculateDifference(user.dailyStats, 'points', 8, Object.keys(user.dailyStats).length),
-        messages: calculateDifference(user.dailyStats, 'messages', 8, Object.keys(user.dailyStats).length),
-        xp: calculateDifference(user.dailyStats, 'xp', 8, Object.keys(user.dailyStats).length),
-    };
-}
-
-function calculateMonthly(user) {
-    user.monthly = {
-        points: calculateDifference(user.dailyStats, 'points', 31, Object.keys(user.dailyStats).length),
-        messages: calculateDifference(user.dailyStats, 'messages', 31, Object.keys(user.dailyStats).length),
-        xp: calculateDifference(user.dailyStats, 'xp', 31, Object.keys(user.dailyStats).length),
-    };
-}
-
-function resetIfInactive(user) {
-    const currentTime = Date.now() * 1000;
-    if (user.lastMSG) {
-        if (currentTime - user.lastMSG > 86400000000) {
-            user.daily = { points: 0, messages: 0, xp: 0 };
-        }
-        if (currentTime - user.lastMSG > 604800000000) {
-            user.weekly = { points: 0, messages: 0, xp: 0 };
-        }
-        if (currentTime - user.lastMSG > 2592000000000) {
-            user.monthly = { points: 0, messages: 0, xp: 0 };
-        }
-    }
-}
 
 app.post('/public/currency', async (req, res) => {
     let t = new Date();
@@ -2001,133 +1846,280 @@ app.post('/public/currency', async (req, res) => {
     }
 });
 
-async function cachePublic() {
-    let users = fs.readFileSync('./user/db/users.json');
-    users = JSON.parse(users);
-    for (let i = 0; i < users.length; i++) {
-        calculateDaily(users[i]);
-        calculateWeekly(users[i]);
-        calculateMonthly(users[i]);
-        resetIfInactive(users[i]);
-        delete users[i].dailyStats;
-        delete users[i].hourlyStats;
-        delete users[i].warns;
-        delete users[i].allWarns;
-        delete users[i].cooldown;
+function calculateDifference(dailyStats, key, daysAgo, currencyLength) {
+    try {
+        let toReturn = parseFloat(Object.values(dailyStats)[currencyLength - 1][key]) - parseFloat(Object.values(dailyStats)[currencyLength - daysAgo][key]);
+        if (isNaN(toReturn)) {
+            return 0;
+        } else {
+            return toReturn;
+        }
+    } catch (err) {
+        return 0;
     }
-    currency = users;
-    fs.writeFileSync('./user/publicCurrencyCache.json', JSON.stringify(users));
 }
-cachePublic();
-setInterval(cachePublic, 120000);
 
-app.get('/:type/:min/:max', async (req, res) => {
-    logRoute(req, res)
-    let sort = req.params.type
-    if (req.query.sort) {
-        sort = req.query.sort
-        if (sort == "gain") {
-            if (req.query.sortType && req.query.sortTime) { } else {
-                res.send('Error')
-                return;
-            }
+function calculateDaily(user) {
+    try {
+        user.daily = {
+            points: calculateDifference(user.dailyStats, 'points', 2, Object.keys(user.dailyStats).length),
+            messages: calculateDifference(user.dailyStats, 'messages', 2, Object.keys(user.dailyStats).length),
+            xp: calculateDifference(user.dailyStats, 'xp', 2, Object.keys(user.dailyStats).length),
+        };
+    } catch (err) { }
+}
+
+function calculateWeekly(user) {
+    try {
+        user.weekly = {
+            points: calculateDifference(user.dailyStats, 'points', 8, Object.keys(user.dailyStats).length),
+            messages: calculateDifference(user.dailyStats, 'messages', 8, Object.keys(user.dailyStats).length),
+            xp: calculateDifference(user.dailyStats, 'xp', 8, Object.keys(user.dailyStats).length),
+        };
+    } catch (err) { }
+}
+
+function calculateMonthly(user) {
+    try {
+        user.monthly = {
+            points: calculateDifference(user.dailyStats, 'points', 31, Object.keys(user.dailyStats).length),
+            messages: calculateDifference(user.dailyStats, 'messages', 31, Object.keys(user.dailyStats).length),
+            xp: calculateDifference(user.dailyStats, 'xp', 31, Object.keys(user.dailyStats).length),
+        };
+    } catch (err) { }
+}
+
+function resetIfInactive(user) {
+    const currentTime = Date.now() * 1000;
+    if (user.lastMSG) {
+        if (currentTime - user.lastMSG > 86400000000) {
+            user.daily = { points: 0, messages: 0, xp: 0 };
+        }
+        if (currentTime - user.lastMSG > 604800000000) {
+            user.weekly = { points: 0, messages: 0, xp: 0 };
+        }
+        if (currentTime - user.lastMSG > 2592000000000) {
+            user.monthly = { points: 0, messages: 0, xp: 0 };
         }
     }
-    if ((req.params.type == "users") || (req.params.type == "gain") || (req.params.type == "points")) {
-        let users = await db.getOne('users')
-        if (users) {
-            let things = [...users];
-            if (things) {
-                if (sort == "verified") {
-                    sort = "isVerified"
-                } else if (sort == "moderator") {
-                    sort = "isModerator"
-                } else if (sort == "owner") {
-                    sort = "isOwner"
-                } else if (sort == "lastmsg") {
-                    sort = "lastMSG"
-                }
-                if (sort == "points" || sort == "messages" || sort == "hours" || sort == "lastMSG" || sort == "xp") {
-                    if (sort == "lastMSG") {
-                        things.sort((a, b) => {
-                            return parseFloat(b["lastMSG"]) - parseFloat(a["lastMSG"])
-                        });
-                    } else {
-                        things.sort((a, b) => {
-                            return parseFloat(b[sort]) - parseFloat(a[sort])
-                        });
-                    }
-                } else if (sort == "isVerified" || sort == "isModerator" || sort == "isOwner") {
-                    things.sort((a, b) => {
-                        return b[sort] - a[sort]
-                    })
-                }
-                if (sort == "gain") {
-                    for (let i = 0; i < things.length; i++) {
-                        let gain = things[i][req.query.sortType];
-                        if (Object.keys(things[i].dailyStats).length > parseFloat(req.query.sortTime)) {
-                            let keys = Object.keys(things[i].dailyStats);
-                            gain = parseFloat(things[i].dailyStats[keys[keys.length - 1]][req.query.sortType]) - parseFloat(things[i].dailyStats[keys[keys.length - (parseFloat(req.query.sortTime) + 1)]][req.query.sortType])
-                            things[i].gain = gain;
-                            if ((new Date() * 1000) - parseFloat(things[i].lastMSG) > (parseFloat(req.query.sortTime) * 86400000000)) {
-                                things[i].gain = 0;
-                            }
-                        } else {
-                            things[i].gain = gain;
-                        }
-                    }
-                    things.sort((a, b) => parseFloat(b['gain']) - parseFloat(a['gain']));
-                }
-                things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
-                if (!req.query.lol) {
-                    for (let i = 0; i < things.length; i++) {
-                        delete things[i].cooldown
-                        delete things[i].dailyStats
-                        delete things[i].hourlyStats
-                        things[i].warns = things[i].warnings ? things[i].warnings : []
-                        things[i].warnings = things[i].warnings ? things[i].warnings.length : 0
-                    }
-                }
-                res.send(things)
-            } else {
-                res.send('Error')
-            }
+}
+
+function relativeTime(previous) {
+    if (previous === 0) {
+        return "never"
+    }
+    previous = parseInt(previous) / 1000;
+    const date = new Date();
+    const timestamp = date.getTime();
+    previous = Math.floor(previous / 1000)
+    const difference = Math.floor(timestamp / 1000) - previous;
+    let output = ``;
+    if (difference < 60) {
+        if (difference === 1) {
+            output = `${difference} second ago`;
         } else {
-            res.send('Error')
+            output = `${difference} seconds ago`;
         }
-    } else if (req.params.type == "votes") {
-        let votes = await db.getOne('votes')
-        votes = votes.sort((a, b) => {
-            return parseFloat(b.votes) - parseFloat(a.votes)
-        });
-        if (votes) {
-            let things = [...votes];
-            if (things) {
-                things.sort((a, b) => {
-                    return parseFloat(b.count) - parseFloat(a.count)
-                });
-                things = things.slice(parseInt(req.params.min), parseInt(req.params.max));
-                res.send(things)
-            } else {
-                res.send('Error')
-            }
+    } else if (difference < 3600) {
+        if (difference === 1) {
+            output = `${Math.floor(difference / 60)} minute ago`;
         } else {
-            res.send('Error')
+            output = `${Math.floor(difference / 60)} minutes ago`;
+        }
+    } else if (difference < 86400) {
+        if (difference === 1) {
+            output = `${Math.floor(difference / 3600)} hour ago`;
+        } else {
+            output = `${Math.floor(difference / 3600)} hours ago`;
+        }
+    } else if (difference < 2620800) {
+        if (difference === 1) {
+            output = `${Math.floor(difference / 86400)} day ago`;
+        } else {
+            output = `${Math.floor(difference / 86400)} days ago`;
+        }
+    } else if (difference < 31449600) {
+        if (difference === 1) {
+            output = `${Math.floor(difference / 2620800)} month ago`;
+        } else {
+            output = `${Math.floor(difference / 2620800)} months ago`;
+        }
+    } else {
+        if (difference === 1) {
+            output = `${Math.floor(difference / 31449600)} year ago`;
+        } else {
+            output = `${Math.floor(difference / 31449600)} years ago`;
         }
     }
-});
-//removeDuplicateUsers();
+    return output;
+}
 
-checkLiveChannels();
+function restoreLastBackup() {
+    let backups = fs.readdirSync('./user/archives');
+    backups.sort(function (a, b) {
+        return fs.statSync('./user/archives/' + b).mtime.getTime() - fs.statSync('./user/archives/' + a).mtime.getTime();
+    });
+    let file = fs.readFileSync('./user/archives/' + backups[0]);
+    let json = JSON.parse(file);
+    fs.writeFileSync('./user/db/commands.json', JSON.stringify(json.commands));
+    fs.writeFileSync('./user/db/connection.json', JSON.stringify(json.connection));
+    fs.writeFileSync('./user/db/counting.json', JSON.stringify(json.counting));
+    fs.writeFileSync('./user/db/giveaway.json', JSON.stringify(json.giveaway));
+    fs.writeFileSync('./user/db/ids.json', JSON.stringify(json.ids));
+    fs.writeFileSync('./user/db/messages.json', JSON.stringify(json.messages));
+    fs.writeFileSync('./user/db/moderation.json', JSON.stringify(json.moderation));
+    fs.writeFileSync('./user/db/settings.json', JSON.stringify(json.settings));
+    fs.writeFileSync('./user/db/stream.json', JSON.stringify(json.stream));
+    fs.writeFileSync('./user/db/timers.json', JSON.stringify(json.timers));
+    fs.writeFileSync('./user/db/users.json', JSON.stringify(json.users));
+    fs.writeFileSync('./user/db/votes.json', JSON.stringify(json.votes));
+}
 
 function endStream() {
-    if ((Child != "") && (Child != undefined)) {
-        Child.send('end');
-        Child = "";
-    }
     checkLiveChannels();
     return true;
 }
+
+async function checkLiveChannels() {
+    try {
+        if (!fs.existsSync('./user/db')) return false;
+        let settings = JSON.parse(fs.readFileSync('./user/db/settings.json'));
+        if (settings && settings.chatbot) {
+            if (!settings.chatbot.enabled) {
+                return false;
+            }
+        }
+        let connection = JSON.parse(fs.readFileSync('./user/db/connection.json'));
+        let stream = JSON.parse(fs.readFileSync('./user/db/stream.json'));
+        if (connection.channel) {
+            function redoThing(already) {
+                if ((stream.id != "") && (stream.id != undefined) && (stream.id != null) && (stream.id.length > 0)) {
+                    if (already) {
+                        stream.id = "";
+                    }
+                }
+                getStream(connection.channel.id, stream.id).then(async (stream2) => {
+                    console.log(stream2)
+                    if (stream2.stream) {
+                        if (chatbot.isLive == false) {
+                            let lcmessages = stream.messages;
+                            await db.overwriteOne('stream', {
+                                id: stream2.stream.id,
+                                title: stream2.stream.title,
+                                thumbnail: 'https://i.ytimg.com/vi/' + stream2.stream.id + '/hqdefault.jpg',
+                                live: true,
+                                messages: lcmessages,
+                                viewers: stream2.stream.viewers
+                            });
+                            //Child = fork('chatbot.js', [connection.channel.id, stream2.stream.id, connection.bot.id]);
+                            //Child.send('Hello from the parent!');
+                            //Child.on('exit', (code, signal) => {
+                            //    console.log(`Child process exited with code ${code} and signal ${signal}`);
+                            //    Child = ""
+                            //     checkLiveChannels();
+                            //  });
+                            //   Child.on('error', (err) => {
+                            //       console.log(err);
+                            //    })
+                            chatbot.startBot(stream2.stream.id, connection.bot.id);
+                        } else {
+                            await db.overwriteOne('stream', {
+                                id: stream2.stream.id,
+                                title: stream2.stream.title,
+                                thumbnail: 'https://i.ytimg.com/vi/' + stream2.stream.id + '/hqdefault.jpg',
+                                live: true,
+                                messages: stream.messages,
+                                viewers: stream2.stream.viewers
+                            });
+                        }
+                    } else {
+                        if (!already) {
+                            redoThing(true);
+                        } else {
+                            if (stream.live) {
+                                console.log('stream ended')
+                                stream.live = false;
+                                await db.overwriteOne('stream', stream);
+                            }
+                        }
+                    }
+                });
+            }
+            redoThing(false);
+        }
+    } catch (err) {
+        console.log(err);
+    }
+}
+
+async function cachePublic() {
+    try {
+        let users = await db.getOne('users');
+        for (let i = 0; i < users.length; i++) {
+            calculateDaily(users[i]);
+            calculateWeekly(users[i]);
+            calculateMonthly(users[i]);
+            resetIfInactive(users[i]);
+            delete users[i].dailyStats;
+            delete users[i].hourlyStats;
+            delete users[i].warns;
+            delete users[i].allWarns;
+            delete users[i].cooldown;
+        }
+        currency = users;
+        fs.writeFileSync('./user/publicCurrencyCache.json', JSON.stringify(users));
+    } catch (err) {
+        console.log(err);
+    }
+}
+
+async function getStream(id, id2) {
+    try {
+        let url = 'https://www.youtube.com/watch?v=' + id2;
+        const { body } = await request(url);
+        let bodyText = await body.text();
+        let stream = bodyText.match(/(?<=hlsManifestUrl":").*\.m3u8/g);
+        if (stream) {
+            let id = bodyText.split(`<link rel="canonical" href="https://www.youtube.com/watch?v=`)[1].split(`">`)[0];
+            let title = bodyText.split(`<title>`)[1].split(` - YouTube</title>`)[0];
+            let viewers = bodyText.split(`viewCount":{"runs":[{"text":"`)[1].split(`"`)[0];
+            return {
+                "stream": {
+                    "id": id,
+                    "title": title,
+                    "viewers": viewers,
+                }
+            };
+        } else {
+            let url = 'https://www.youtube.com/channel/' + id + '/live';
+            //let url = 'https://www.youtube.com/watch?v=pnZ8bRsjSAs'// + id2;
+            const { body } = await request(url);
+            let bodyText = await body.text();
+            let stream = bodyText.match(/(?<=hlsManifestUrl":").*\.m3u8/g);
+            if (stream) {
+                let id = bodyText.split(`<link rel="canonical" href="https://www.youtube.com/watch?v=`)[1].split(`">`)[0];
+                let title = bodyText.split(`<title>`)[1].split(` - YouTube</title>`)[0];
+                let viewers = bodyText.split(`viewCount":{"runs":[{"text":"`)[1].split(`"`)[0];
+                return {
+                    "stream": {
+                        "id": id,
+                        "title": title,
+                        "viewers": viewers,
+                    }
+                };
+            } else {
+                return ({ "stream": null });
+            }
+        }
+    } catch (e) {
+        console.log(e)
+        return ({ "stream": null });
+    }
+}
+
+cachePublic();
+checkLiveChannels();
+setInterval(cachePublic, 10000);
 
 app.listen(8080, () => {
     console.log('Server started: http://localhost:8080');

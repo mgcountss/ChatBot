@@ -5,36 +5,18 @@ import https from "https";
 import fs from 'fs';
 import db from './db.js';
 import { fork } from 'child_process';
-//let sender = fork('sender.js', [process.argv[2], process.argv[3], process.argv[4]]);
 
 console.log('Starting chatbot...')
 const axiosInstance = axios.create({
     timeout: 10000,
     httpsAgent: new https.Agent({ keepAlive: true }),
 });
-let mc = await Masterchat.init(process.argv[3], { axiosInstance, credentials: fs.readFileSync('./user/credentials.txt', 'utf8') });
 
+let mc;
+let isLive = false;
 let webhook1;
 let webhook2;
 let webhook3;
-
-let batch = {
-    "ids": [],
-    "messages": [],
-    "users": [],
-    "moderation": {},
-    "stream": {},
-    "giveaway": {},
-    "settings": {},
-    "counting": {},
-    "commands": [],
-    "votes": [],
-    "connection": {},
-    "commands": [],
-    "active": false
-}
-let end = false;
-let addToBatch = [];
 
 try {
     webhook1 = fs.readFileSync('./user/webhook1.txt', 'utf8');
@@ -48,44 +30,57 @@ try {
     webhook3 = webhook3 + "?wait=true"
 } catch (err) { }
 
-process.on('message', (message) => {
-    if (message.startsWith('ban___')) {
-        let id = message.split('___')[1];
+function action(thing, id) {
+    if (thing == "ban") {
         mc.hide(id).catch((error) => {
             console.error(error);
         });
-    } else if (message.startsWith('delete___')) {
-        let id = message.split('___')[1];
-        db.removeObject('messages', 'id', id);
+    } else if (thing == "delete") {
         mc.remove(id).catch((error) => {
             console.error(error);
         });
-    } else if (message.startsWith('timeout___')) {
-        let id = message.split('___')[1]
+    } else if (thing == 'timeout') {
         mc.timeout(id).catch((error) => {
             console.error(error);
         });
-    } else if (message.startsWith('end')) {
-        end = true;
     }
-});
+};
 
 let preventDouble = [];
 let lastCalledMinutes = new Date().getMinutes() - 1;
 let futureChats = [];
 let goingThroughMessages = false;
+let id = "";
+let bot = "";
 
-mc.on("actions", async (chats) => {
-    if (chats.length > 0) {
-        for (const chat of chats) {
-            if (chat.type === 'addChatItemAction') {
-                if (chat.timestampUsec > new Date().getTime() * 1000 - 300000000) {
-                    futureChats.push(chat);
+const startBot = async (id1, bot1) => {
+    id = id1;
+    bot = bot1;
+    mc = await Masterchat.init(id1, { axiosInstance, credentials: fs.readFileSync('./user/credentials.txt', 'utf8') });
+    mc.on("error", async (err) => {
+        console.log(err);
+    });
+    mc.on("end", async () => {
+        console.log("ended");
+    });
+    mc.on("actions", async (chats) => {
+        if (chats.length > 0) {
+            for (const chat of chats) {
+                if (chat.type === 'addChatItemAction') {
+                    if (chat.timestampUsec > new Date().getTime() * 1000 - 300000000) {
+                        futureChats.push(chat);
+                    }
                 }
             }
         }
-    }
-});
+    });
+    isLive = true;
+    mc.listen();
+}
+
+const stopBot = async () => {
+    mc.stop();
+}
 
 setInterval(async () => {
     if (goingThroughMessages == false) {
@@ -113,55 +108,32 @@ setInterval(async () => {
     }
 }, 10000);
 
-mc.on("error", async (err) => {
-    end = true;
-    console.log(err);
-    process.exit();
-});
-
-mc.on("end", async () => {
-    end = true;
-    process.exit();
-})
-
 async function chatAction(chats) {
+    let messages = await db.getOne('messages');
+    let ids = await db.getOne('ids');
     goingThroughMessages = true;
     console.log("Received " + chats.length + " messages");
     chats = chats.sort((a, b) => a.timestampUsec - b.timestampUsec);
-    batch.ids = await db.getOne('ids');
-    batch.messages = await db.getOne('messages');
-    batch.users = await db.getOne('users');
-    batch.moderation = await db.getOne('moderation');
-    batch.stream = await db.getOne('stream');
-    batch.giveaway = await db.getOne('giveaway');
-    batch.settings = await db.getOne('settings');
-    batch.counting = await db.getOne('counting');
-    batch.commands = await db.getOne('commands');
-    batch.votes = await db.getOne('votes');
-    batch.connection = await db.getOne('connection');
-    batch.commands = await db.getOne('commands');
-    batch.active = true;
     let index = 0;
     for (const chat of chats) {
         index++;
-        console.log(index + "/" + chats.length + ": " + stringify(chat.message));
+        //console.log(index + "/" + chats.length + ": " + stringify(chat.message));
         async function part1() {
-            if (!batch.ids.includes(chat.id)) {
+            if (ids.includes(chat.id) == false) {
                 if (!preventDouble.includes(chat.id)) {
                     preventDouble.push(chat.id);
                     if (preventDouble.length > 100) {
                         preventDouble.shift();
                     }
                     if (chat.type === 'addChatItemAction') {
-                        let a = new Date();
-                        return await logMessage(chat, a);
+                        return await logMessage(chat);
                     } else if (chat.type === 'moderationMessageAction') {
-                        batch.ids.push(chat.id);
+                        await db.addTo('ids', chat.id);
                         if (chat.message) {
                             const modifiedMessage = stringify(chat.message).replace(/@/g, '?');
                             return await sendMessageToWebhook(webhook2, modifiedMessage);
                         } else {
-                            const deletedMessage = 'Deleted message: ' + stringify(batch.messages.find(x => x.targetId === chat.id).rawMessage);
+                            const deletedMessage = 'Deleted message: ' + stringify(messages.find(x => x.targetId === chat.id).rawMessage);
                             return await sendMessageToWebhook(webhook2, deletedMessage);
                         }
                     }
@@ -170,43 +142,12 @@ async function chatAction(chats) {
         }
         await part1().then(async () => {
             if (index == chats.length) {
-                console.log("overwriting");
-                await db.overwriteOne('ids', batch.ids);
-                await db.overwriteOne('messages', batch.messages);
-                await db.overwriteOne('users', batch.users);
-                await db.overwriteOne('moderation', batch.moderation);
-                await db.overwriteOne('stream', batch.stream);
-                await db.overwriteOne('giveaway', batch.giveaway);
-                await db.overwriteOne('settings', batch.settings);
-                await db.overwriteOne('counting', batch.counting);
-                await db.overwriteOne('commands', batch.commands);
-                await db.overwriteOne('votes', batch.votes);
-                await db.overwriteOne('connection', batch.connection);
-                await db.overwriteOne('commands', batch.commands);
-                batch = {
-                    "ids": [],
-                    "messages": [],
-                    "users": [],
-                    "moderation": {},
-                    "stream": {},
-                    "giveaway": {},
-                    "settings": {},
-                    "counting": {},
-                    "commands": [],
-                    "votes": [],
-                    "connection": {},
-                    "commands": [],
-                    "active": false
-                }
                 if (new Date().getMinutes() !== lastCalledMinutes) {
                     if ((new Date().getMinutes() % 5 == 0) || ((new Date().getMinutes() % 5) == (lastCalledMinutes + 1)) && (lastCalledMinutes !== new Date().getMinutes() - 1) && (lastCalledMinutes !== new Date().getMinutes() + 1)) {
                         console.log("Updating everything");
                         lastCalledMinutes = new Date().getMinutes();
                         await updateEverything();
                     }
-                }
-                if (end == true) {
-                    process.exit();
                 }
             }
             return "";
@@ -239,349 +180,352 @@ function checkmilestone(num) {
     }
 }
 
-async function logMessage(chat, start) {
-    let { users, moderation, messages, ids, stream, giveaway, settings, counting, commands } = JSON.parse(JSON.stringify(batch));
+async function logMessage(chat) {
+    let users = await db.getOne('users');
+    let moderation = await db.getOne('moderation');
+    let messages = await db.getOne('messages');
+    let ids = await db.getOne('ids');
+    let stream = await db.getOne('stream');
+    let giveaway = await db.getOne('giveaway');
+    let settings = await db.getOne('settings');
+    let counting = await db.getOne('counting');
+    let commands = await db.getOne('commands');
     let found = false;
     let respond = true;
-    if (users && moderation && messages && ids && stream && giveaway && settings) {
-        if (!ids.includes(chat.id)) {
-            const userId = chat.authorChannelId;
-            let userFound = users.find(u => u.id === userId);
-            let a = new Date();
-            let b = new Date();
-            part1();
-            function part1() {
-                if (userFound) {
-                    found = true;
-                    if (!userFound.warns) {
-                        userFound.warns = [];
-                    }
-                    if (!userFound.allWarns) {
-                        userFound.allWarns = [];
-                    }
-                    if ((userId !== process.argv[4]) && (moderation.enabled == true)) {
-                        if (moderation.messagesPer10SecondsEnabled) {
-                            let totalMessages = 1;
-                            let msgs = [];
-                            for (let i = 0; i < users.length; i++) {
-                                if (users[i].id === userId) {
-                                    const filtered = messages.filter(x => x.timestampUsec > chat.timestampUsec - 10000000);
-                                    for (let j = 0; j < filtered.length; j++) {
-                                        if (filtered[j].authorChannelId === userId) {
-                                            if (!moderation.checked10.includes(filtered[j].id)) {
-                                                totalMessages++;
-                                                msgs.push(filtered[j].id);
-                                            }
+    if (ids.includes(chat.id) == false) {
+        const userId = chat.authorChannelId;
+        let userFound = users.find(u => u.id === userId);
+        part1();
+        async function part1() {
+            if (userFound) {
+                found = true;
+                if (!userFound.warns) {
+                    userFound.warns = [];
+                }
+                if (!userFound.allWarns) {
+                    userFound.allWarns = [];
+                }
+                if ((userId !== bot) && (moderation.enabled == true)) {
+                    if (moderation.messagesPer10SecondsEnabled) {
+                        let totalMessages = 1;
+                        let msgs = [];
+                        for (let i = 0; i < users.length; i++) {
+                            if (users[i].id === userId) {
+                                const filtered = messages.filter(x => x.timestampUsec > chat.timestampUsec - 10000000);
+                                for (let j = 0; j < filtered.length; j++) {
+                                    if (filtered[j].authorChannelId === userId) {
+                                        if (!moderation.checked10.includes(filtered[j].id)) {
+                                            totalMessages++;
+                                            msgs.push(filtered[j].id);
                                         }
                                     }
-                                    break;
                                 }
-                            }
-                            if (totalMessages > parseFloat(moderation.messagesPer10Seconds)) {
-                                respond = false;
-                                userFound.warns.push({
-                                    type: 'messagesPer10Seconds',
-                                    message: chat.message,
-                                    timestamp: chat.timestampUsec,
-                                });
-                                userFound.allWarns.push({
-                                    type: 'messagesPer10Seconds',
-                                    message: chat.message,
-                                    timestamp: chat.timestampUsec,
-                                });
-                                batch.moderation.actions.push({
-                                    type: 'messagesPer10Seconds',
-                                    message: chat.message,
-                                    timestamp: chat.timestampUsec
-                                });
-                                msgs.push(chat.id);
-                                for (let i = 0; i < msgs.length; i++) {
-                                    batch.moderation.checked10.push(msgs[i]);
-                                }
-                                if (userFound.warns.length < moderation.warnsBeforeTimeout) {
-                                    sendMSG(`@${userFound.name} was warned for spamming (${userFound.warns.length}/${moderation.warnsBeforeTimeout})`);
-                                }
+                                break;
                             }
                         }
-                        if (moderation.messagesPerMinuteEnabled) {
-                            let totalMessages = 1;
-                            let msgs = [];
-                            for (let i = 0; i < users.length; i++) {
-                                if (users[i].id === userId) {
-                                    const filtered = messages.filter(x => x.timestampUsec > chat.timestampUsec - 60000000);
-                                    for (let j = 0; j < filtered.length; j++) {
-                                        if (filtered[j].authorChannelId === userId) {
-                                            if (!moderation.checked60.includes(filtered[j].id)) {
-                                                totalMessages++;
-                                                msgs.push(filtered[j].id);
-                                            }
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-                            if (totalMessages > parseFloat(moderation.messagesPerMinute)) {
-                                respond = false;
-                                userFound.warns.push({
-                                    type: 'messagesPerMinute',
-                                    message: chat.message,
-                                    timestamp: chat.timestampUsec,
-                                });
-                                userFound.allWarns.push({
-                                    type: 'messagesPerMinute',
-                                    message: chat.message,
-                                    timestamp: chat.timestampUsec,
-                                });
-                                batch.moderation.actions.push({
-                                    type: 'messagesPerMinute',
-                                    message: chat.message,
-                                    timestamp: chat.timestampUsec
-                                });
-                                msgs.push(chat.id);
-                                for (let i = 0; i < msgs.length; i++) {
-                                    batch.moderation.checked60.push(msgs[i]);
-                                }
-                                if (userFound.warns.length < moderation.warnsBeforeTimeout) {
-                                    sendMSG(`@${userFound.name} was warned for spamming (${userFound.warns.length}/${moderation.warnsBeforeTimeout})`);
-                                }
-                            }
-                        }
-                        if (userFound.warns.length >= moderation.warnsBeforeTimeout) {
-                            sendMSG(`@${userFound.name} was put in timeout`);
-                            batch.moderation.actions.push({
-                                type: 'timeout',
-                                message: `@${userFound.name} was put in timeout`,
+                        if (totalMessages > parseFloat(moderation.messagesPer10Seconds)) {
+                            respond = false;
+                            userFound.warns.push({
+                                type: 'messagesPer10Seconds',
+                                message: chat.message,
                                 timestamp: chat.timestampUsec,
                             });
-                            userFound.warns = [];
-                            mc.timeout(userFound.id).catch((error) => {
-                                console.error(error);
+                            userFound.allWarns.push({
+                                type: 'messagesPer10Seconds',
+                                message: chat.message,
+                                timestamp: chat.timestampUsec,
+                            });
+                            await db.addToWithinObject('moderation', 'actions', {
+                                type: 'messagesPer10Seconds',
+                                message: chat.message,
+                                timestamp: chat.timestampUsec
+                            });
+                            msgs.push(chat.id);
+                            for (let i = 0; i < msgs.length; i++) {
+                                await db.addToWithinObject('moderation', 'checked10', msgs[i]);
+                            }
+                            if (userFound.warns.length < moderation.warnsBeforeTimeout) {
+                                sendMSG(`@${userFound.name} was warned for spamming (${userFound.warns.length}/${moderation.warnsBeforeTimeout})`);
+                            }
+                        }
+                    }
+                    if (moderation.messagesPerMinuteEnabled) {
+                        let totalMessages = 1;
+                        let msgs = [];
+                        for (let i = 0; i < users.length; i++) {
+                            if (users[i].id === userId) {
+                                const filtered = messages.filter(x => x.timestampUsec > chat.timestampUsec - 60000000);
+                                for (let j = 0; j < filtered.length; j++) {
+                                    if (filtered[j].authorChannelId === userId) {
+                                        if (!moderation.checked60.includes(filtered[j].id)) {
+                                            totalMessages++;
+                                            msgs.push(filtered[j].id);
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                        if (totalMessages > parseFloat(moderation.messagesPerMinute)) {
+                            respond = false;
+                            userFound.warns.push({
+                                type: 'messagesPerMinute',
+                                message: chat.message,
+                                timestamp: chat.timestampUsec,
+                            });
+                            userFound.allWarns.push({
+                                type: 'messagesPerMinute',
+                                message: chat.message,
+                                timestamp: chat.timestampUsec,
+                            });
+                            await db.addToWithinObject('moderation', 'actions', {
+                                type: 'messagesPerMinute',
+                                message: chat.message,
+                                timestamp: chat.timestampUsec
+                            });
+                            msgs.push(chat.id);
+                            for (let i = 0; i < msgs.length; i++) {
+                                await db.addToWithinObject('moderation', 'checked60', msgs[i]);
+                            }
+                            if (userFound.warns.length < moderation.warnsBeforeTimeout) {
+                                sendMSG(`@${userFound.name} was warned for spamming (${userFound.warns.length}/${moderation.warnsBeforeTimeout})`);
+                            }
+                        }
+                    }
+                    if (userFound.warns.length >= moderation.warnsBeforeTimeout) {
+                        sendMSG(`@${userFound.name} was put in timeout`);
+                        await db.addToWithinObject('moderation', 'actions', {
+                            type: 'timeout',
+                            message: `@${userFound.name} was put in timeout`,
+                            timestamp: chat.timestampUsec
+                        });
+                        userFound.warns = [];
+                        mc.timeout(userFound.id).catch((error) => {
+                            console.error(error);
+                        });
+                    }
+                }
+                chat.timestampUsec = parseFloat(chat.timestampUsec);
+                userFound.messages = parseInt(userFound.messages) + 1;
+                if ((!userFound.xp) || (userFound.xp == null) || (userFound.xp == undefined) || (isNaN(userFound.xp))) {
+                    userFound.xp = 0;
+                }
+                userFound.xp = parseInt(userFound.xp) + 3;
+                if (userFound.id !== bot) {
+                    if (checkmilestone(parseInt(userFound.messages))) {
+                        sendMSG(`${userFound.name} has sent ${userFound.messages.toLocaleString()} messages!`);
+                    }
+                }
+                userFound.active = true;
+                userFound.membership = chat.membership;
+                userFound.isVerified = chat.isVerified;
+                userFound.isOwner = chat.isOwner;
+                userFound.isModerator = chat.isModerator;
+                userFound.name = chat.authorName.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                userFound.photo = chat.authorPhoto;
+                userFound.lastMSG = parseFloat(chat.timestampUsec);
+                await db.overwriteObjectInArray('users', 'id', userFound.id, userFound);
+                part2()
+            } else {
+                part2()
+            }
+        }
+        async function part2() {
+            let users = await db.getOne('users');
+            let commands = await db.getOne('commands');
+            let settings = await db.getOne('settings');
+            let stream = await db.getOne('stream');
+            let ids = await db.getOne('ids');
+            let messages = await db.getOne('messages');
+            let giveaway = await db.getOne('giveaway');
+            let counting = await db.getOne('counting');
+            let found = false;
+            let respond = true;
+
+            if (!found) {
+                let obj = {
+                    id: chat.authorChannelId,
+                    messages: 1,
+                    lastMSG: parseFloat(chat.timestampUsec),
+                    membership: chat.membership,
+                    isOwner: chat.isOwner,
+                    isModerator: chat.isModerator,
+                    isVerified: chat.isVerified,
+                    name: chat.authorName.replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+                    photo: chat.authorPhoto,
+                    hours: 0,
+                    points: 1,
+                    xp: 0,
+                    cooldown: [],
+                    warns: [],
+                    allWarns: [],
+                    customRank: "",
+                    firstseen: parseFloat(chat.timestampUsec),
+                    active: true,
+                    blacklist: [],
+                    hourlyStats: {
+                        "0": {
+                            "messages": 0,
+                            "xp": 0,
+                            "points": 0
+                        }
+                    },
+                    dailyStats: {},
+                    warnings: []
+                };
+                await db.addTo('users', obj);
+                sendMSG(`Welcome @${obj.name} to the stream!`);
+            }
+            if (chat.membership) {
+                chat.member = chat.membership.status;
+            }
+            chat.message = (stringify(chat.message)).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            chat.authorName = (stringify(chat.authorName)).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            if (!stream.messages || stream.messages == null || stream.messages == undefined || isNaN(stream.messages)) {
+                stream.messages = 1;
+            } else {
+                stream.messages++;
+            }
+            if (!fs.existsSync('./user')) {
+                fs.mkdirSync('./user');
+            }
+            if (!fs.existsSync('./user/streams')) {
+                fs.mkdirSync('./user/streams');
+            }
+            if (fs.existsSync('./user/streams/' + stream.id + '.csv')) {
+                fs.appendFileSync('./user/streams/' + stream.id + '.csv', '\n' + chat.id + ',' + chat.timestampUsec + ',' + chat.authorName + ',' + chat.message);
+            } else {
+                fs.writeFileSync('./user/streams/' + stream.id + '.csv', "id,time,name,message\n" + chat.id + ',' + chat.timestampUsec + ',' + chat.authorName + ',' + chat.message);
+            }
+            await db.addTo('ids', chat.id);
+            await db.addTo('messages', chat);
+            if (ids.length + 1 > 100) {
+                await db.removeFirstObject('ids');
+            }
+            if (messages.length + 1 > 500) {
+                await db.removeFirstObject('messages');
+            }
+            await db.overwriteOne('stream', stream);
+            if (webhook1) {
+                let msg = chat.message.replace(/@/g, '?');
+                //msg = msg + "[channel](https://www.youtube.com/channel/" + chat.authorChannelId + ")";
+                fetch(webhook1, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        "content": msg,
+                        "username": chat.authorName,
+                        "avatar_url": chat.authorPhoto
+                    })
+                }).catch(err => console.log(err))
+            }
+            if (respond == true) {
+                if (!(chat.authorChannelId == bot)) {
+                    let cmd = false;
+                    for (let i = 0; i < commands.length; i++) {
+                        let add = 1;
+                        if ((chat.message.includes('!vote ')) || (chat.message.includes('!wall'))) {
+                            add = 5;
+                        }
+                        if ((stringify(chat.message).split(' ')[0].length > 1) && (stringify(chat.message).split(' ')[0].toLowerCase()) == ((commands[i].command.toLowerCase()))) {
+                            const userIndex = users.findIndex(x => x.id === chat.authorChannelId);
+                            if (userIndex !== -1) {
+                                if ((!users[userIndex].xp) || (users[userIndex].xp == null) || (users[userIndex].xp == undefined) || (isNaN(users[userIndex].xp))) {
+                                    users[userIndex].xp = 0;
+                                }
+                                add = add * 3;
+                                users[userIndex].xp += add;
+                                await db.overwriteObjectInArray('users', 'id', chat.authorChannelId, users[userIndex]);
+                            } else {
+                                console.log("User not found");
+                            }
+                            return await handleCommand(chat, commands[i]);
+                        } else if (commands[i].command.toLowerCase() == stringify(chat.message).toLowerCase()) {
+                            const userIndex = users.findIndex(x => x.id === chat.authorChannelId);
+                            if (userIndex !== -1) {
+                                if ((!users[userIndex].xp) || (users[userIndex].xp == null) || (users[userIndex].xp == undefined) || (isNaN(users[userIndex].xp))) {
+                                    users[userIndex].xp = 0;
+                                }
+                                add = add * 3;
+                                users[userIndex].xp += add
+                                await db.overwriteObjectInArray('users', 'id', chat.authorChannelId, users[userIndex]);
+                            } else {
+                                console.log("User not found");
+                            }
+                            return await handleCommand(chat, commands[i]);
+                        }
+                    }
+                    if ((cmd == false) && (chat.message)) {
+                        if (stringify(chat.message).toLowerCase().includes(giveaway.command.toLowerCase()) || giveaway.command.toLowerCase() == stringify(chat.message).toLowerCase()) {
+                            if (giveaway.enabled) {
+                                return await handleGiveaway(chat, commands[i], i);
+                            }
+                        } else if (settings.counting.enabled) {
+                            if ((stringify(chat.message) == (counting.number + 1).toString()) || (stringify(chat.message).startsWith((counting.number + 1).toString()))) {
+                                const userIndex = users.findIndex(x => x.id === chat.authorChannelId);
+                                if (userIndex !== -1) {
+                                    if ((!users[userIndex].xp) || (users[userIndex].xp == null) || (users[userIndex].xp == undefined) || (isNaN(users[userIndex].xp))) {
+                                        users[userIndex].xp = 0;
+                                    }
+                                    users[userIndex].xp += 15
+                                    await db.overwriteObjectInArray('users', 'id', chat.authorChannelId, users[userIndex]);
+                                } else {
+                                    console.log("User not found");
+                                }
+                                if (checkmilestone(counting.number + 1)) {
+                                    sendMSG(`${chat.authorName} has counted to ${counting.number + 1}!`);
+                                    if (userIndex !== -1) {
+                                        users[userIndex].xp += 45;
+                                        await db.overwriteObjectInArray('users', 'id', chat.authorChannelId, users[userIndex]);
+                                    }
+                                }
+                                return await handleCounting(chat);
+                            }
+                        }
+                        if (stringify(chat.message).startsWith('!')) {
+                            chat.message = stringify(chat.message);
+                            chat.message = chat.message.replace('!', '!vote ');
+                            const userIndex = users.findIndex(x => x.id === chat.authorChannelId);
+                            if (userIndex !== -1) {
+                                if ((!users[userIndex].xp) || (users[userIndex].xp == null) || (users[userIndex].xp == undefined) || (isNaN(users[userIndex].xp))) {
+                                    users[userIndex].xp = 0;
+                                }
+                                users[userIndex].xp += 15;
+                                await db.overwriteObjectInArray('users', 'id', chat.authorChannelId, users[userIndex]);
+                            } else {
+                                console.log("User not found");
+                            }
+                            return await handleCommand(chat, {
+                                "command": "!vote",
+                                "response": "{authorName} {ifBlock {authorCustomRole}} voted for {vote {query}} ({math {voteCount {query}} + 1})",
+                                "permission": "everyone",
+                                "cooldown": 30,
+                                "default": true,
+                                "id": "8tuf4g"
                             });
                         }
-                    }
-                    b = new Date();
-                    chat.timestampUsec = parseFloat(chat.timestampUsec);
-                    userFound.messages = parseInt(userFound.messages) + 1;
-                    if ((!userFound.xp) || (userFound.xp == null) || (userFound.xp == undefined) || (isNaN(userFound.xp))) {
-                        userFound.xp = 0;
-                    }
-                    //triple
-                    userFound.xp = parseInt(userFound.xp) + 3;
-                    if (userFound.id !== process.argv[4]) {
-                        if (checkmilestone(parseInt(userFound.messages))) {
-                            sendMSG(`${userFound.name} has sent ${userFound.messages.toLocaleString()} messages!`);
-                        }
-                    }
-                    userFound.active = true;
-                    userFound.membership = chat.membership;
-                    userFound.isVerified = chat.isVerified;
-                    userFound.isOwner = chat.isOwner;
-                    userFound.isModerator = chat.isModerator;
-                    userFound.name = chat.authorName.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    userFound.photo = chat.authorPhoto;
-                    userFound.lastMSG = parseFloat(chat.timestampUsec);
-                    for (let i = 0; i < batch.users.length; i++) {
-                        if (batch.users[i].id == userFound.id) {
-                            batch.users[i] = userFound;
-                            break;
-                        }
-                    }
-                    b = new Date();
-                    part2()
-                } else {
-                    part2()
-                }
-            }
-            async function part2() {
-                a = new Date();
-                if (!found) {
-                    let obj = {
-                        id: chat.authorChannelId,
-                        messages: 1,
-                        lastMSG: parseFloat(chat.timestampUsec),
-                        membership: chat.membership,
-                        isOwner: chat.isOwner,
-                        isModerator: chat.isModerator,
-                        isVerified: chat.isVerified,
-                        name: chat.authorName.replace(/</g, '&lt;').replace(/>/g, '&gt;'),
-                        photo: chat.authorPhoto,
-                        hours: 0,
-                        points: 1,
-                        xp: 0,
-                        cooldown: [],
-                        warns: [],
-                        allWarns: [],
-                        customRank: "",
-                        firstseen: parseFloat(chat.timestampUsec),
-                        active: true,
-                        blacklist: [],
-                        hourlyStats: {
-                            "0": {
-                                "messages": 0,
-                                "xp": 0,
-                                "points": 0
-                            }
-                        },
-                        dailyStats: {},
-                        warnings: []
-                    };
-                    batch.users.push(obj);
-                    sendMSG(`Welcome @${obj.name} to the stream!`);
-                }
-                if (chat.membership) {
-                    chat.member = chat.membership.status;
-                }
-                chat.message = (stringify(chat.message)).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                chat.authorName = (stringify(chat.authorName)).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                if (!stream.messages || stream.messages == null || stream.messages == undefined || isNaN(stream.messages)) {
-                    stream.messages = 1;
-                } else {
-                    stream.messages++;
-                }
-                if (!fs.existsSync('./user')) {
-                    fs.mkdirSync('./user');
-                }
-                if (!fs.existsSync('./user/streams')) {
-                    fs.mkdirSync('./user/streams');
-                }
-                if (fs.existsSync('./user/streams/' + stream.id + '.csv')) {
-                    fs.appendFileSync('./user/streams/' + stream.id + '.csv', '\n' + chat.id + ',' + chat.timestampUsec + ',' + chat.authorName + ',' + chat.message);
-                } else {
-                    fs.writeFileSync('./user/streams/' + stream.id + '.csv', "id,time,name,message\n" + chat.id + ',' + chat.timestampUsec + ',' + chat.authorName + ',' + chat.message);
-                }
-                batch.messages.push(chat);
-                batch.ids.push(chat.id);
-                if (ids.length + 1 > 100) {
-                    batch.ids.shift();
-                }
-                if (messages.length + 1 > 500) {
-                    batch.messages.shift();
-                }
-                batch.stream = stream;
-                if (webhook1) {
-                    let msg = chat.message.replace(/@/g, '?');
-                    //msg = msg + "[channel](https://www.youtube.com/channel/" + chat.authorChannelId + ")";
-                    fetch(webhook1, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            "content": msg,
-                            "username": chat.authorName,
-                            "avatar_url": chat.authorPhoto
-                        })
-                    }).catch(err => console.log(err))
-                }
-                if (respond == true) {
-                    if (!(chat.authorChannelId == process.argv[4])) {
-                        let cmd = false;
-                        for (let i = 0; i < commands.length; i++) {
-                            let add = 1;
-                            if ((chat.message.includes('!vote ')) || (chat.message.includes('!wall'))) {
-                                add = 5;
-                            }
-                            if ((stringify(chat.message).split(' ')[0].length > 1) && (stringify(chat.message).split(' ')[0].toLowerCase()) == ((commands[i].command.toLowerCase()))) {
-                                const userIndex = batch.users.findIndex(x => x.id === chat.authorChannelId);
-                                if (userIndex !== -1) {
-                                    if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
-                                        batch.users[userIndex].xp = 0;
-                                    }
-                                    //triple
-                                    add = add * 3;
-                                    batch.users[userIndex].xp += add;
-                                } else {
-                                    console.log("User not found");
+                        const userIndex = users.findIndex(x => x.id === chat.authorChannelId);
+                        if (((stringify(chat.message).includes('aj')) || (stringify(chat.message).includes('mg'))) && ((stringify(chat.message).includes('best')) || (stringify(chat.message).includes('great')) || (stringify(chat.message).includes('good')))) {
+                            if (userIndex !== -1) {
+                                if ((!users[userIndex].xp) || (users[userIndex].xp == null) || (users[userIndex].xp == undefined) || (isNaN(users[userIndex].xp))) {
+                                    users[userIndex].xp = 0;
                                 }
-                                return await handleCommand(chat, commands[i]);
-                            } else if (commands[i].command.toLowerCase() == stringify(chat.message).toLowerCase()) {
-                                const userIndex = batch.users.findIndex(x => x.id === chat.authorChannelId);
-                                if (userIndex !== -1) {
-                                    if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
-                                        batch.users[userIndex].xp = 0;
-                                    }
-                                    //triple
-                                    add = add * 3;
-                                    batch.users[userIndex].xp += add
-                                } else {
-                                    console.log("User not found");
-                                }
-                                return await handleCommand(chat, commands[i]);
-                            }
-                        }
-                        if ((cmd == false) && (chat.message)) {
-                            if (stringify(chat.message).toLowerCase().includes(giveaway.command.toLowerCase()) || giveaway.command.toLowerCase() == stringify(chat.message).toLowerCase()) {
-                                if (giveaway.enabled) {
-                                    return await handleGiveaway(chat, commands[i], i);
-                                }
-                            } else if (settings.counting.enabled) {
-                                if ((stringify(chat.message) == (counting.number + 1).toString()) || (stringify(chat.message).startsWith((counting.number + 1).toString()))) {
-                                    const userIndex = batch.users.findIndex(x => x.id === chat.authorChannelId);
-                                    if (userIndex !== -1) {
-                                        if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
-                                            batch.users[userIndex].xp = 0;
-                                        }
-                                        //triple
-                                        batch.users[userIndex].xp += 15
-                                    } else {
-                                        console.log("User not found");
-                                    }
-                                    if (checkmilestone(counting.number + 1)) {
-                                        sendMSG(`${chat.authorName} has counted to ${counting.number + 1}!`);
-                                        if (userIndex !== -1) {
-                                            //triple
-                                            batch.users[userIndex].xp += 45;
-                                        }
-                                    }
-                                    return await handleCounting(chat);
-                                }
-                            }
-                            if (stringify(chat.message).startsWith('!')) {
-                                chat.message = stringify(chat.message);
-                                chat.message = chat.message.replace('!', '!vote ');
-                                const userIndex = batch.users.findIndex(x => x.id === chat.authorChannelId);
-                                if (userIndex !== -1) {
-                                    if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
-                                        batch.users[userIndex].xp = 0;
-                                    }
-                                    //triple
-                                    batch.users[userIndex].xp += 15;
-                                } else {
-                                    console.log("User not found");
-                                }
-                                return await handleCommand(chat, {
-                                    "command": "!vote",
-                                    "response": "{authorName} {ifBlock {authorCustomRole}} voted for {vote {query}} ({math {voteCount {query}} + 1})",
-                                    "permission": "everyone",
-                                    "cooldown": 30,
-                                    "default": true,
-                                    "id": "8tuf4g"
-                                });
-                            }
-                            const userIndex = batch.users.findIndex(x => x.id === chat.authorChannelId);
-                            if (((stringify(chat.message).includes('aj')) || (stringify(chat.message).includes('mg'))) && ((stringify(chat.message).includes('best')) || (stringify(chat.message).includes('great')) || (stringify(chat.message).includes('good')))) {
-                                if (userIndex !== -1) {
-                                    if ((!batch.users[userIndex].xp) || (batch.users[userIndex].xp == null) || (batch.users[userIndex].xp == undefined) || (isNaN(batch.users[userIndex].xp))) {
-                                        batch.users[userIndex].xp = 0;
-                                    }
-                                    //triple
-                                    batch.users[userIndex].xp += 15
-                                }
+                                users[userIndex].xp += 15;
+                                await db.overwriteObjectInArray('users', 'id', chat.authorChannelId, users[userIndex]);
                             }
                         }
                     }
                 }
             }
         }
-    } else {
-        console.log('something is undefined');
     }
     return "";
 }
 
 async function handleCommand(chat, command) {
-    let a = new Date();
-    let { users } = JSON.parse(JSON.stringify(batch));
+    let users = await db.getOne('users');
     return await part1();
     async function part1() {
         let cooldown = false;
@@ -634,9 +578,10 @@ async function handleCommand(chat, command) {
                     } else {
                         users[i].cooldown = [];
                     }
-                    for (let i = 0; i < batch.users.length; i++) {
-                        if (batch.users[i].id == users[i].id) {
-                            batch.users[i].cooldown = users[i].cooldown;
+                    for (let i = 0; i < users.length; i++) {
+                        if (users[i].id == users[i].id) {
+                            users[i].cooldown = users[i].cooldown;
+                            await db.overwriteObjectInArray('users', 'id', users[i].id, users[i]);
                             break;
                         }
                     }
@@ -647,6 +592,7 @@ async function handleCommand(chat, command) {
         return await part2(cooldown, thing)
     }
     async function part2(cooldown, thing) {
+        let commands = await db.getOne('commands');
         if ((cooldown == false) && (thing == true)) {
             chat.message = stringify(chat.message);
             if (chat.message.includes(' ')) {
@@ -660,9 +606,10 @@ async function handleCommand(chat, command) {
                 for (let i = 1; i < message.length; i++) {
                     response = response.replace(`{${i}}`, message[i]);
                 }
-                for (let i = 0; i < batch.commands.length; i++) {
-                    if (batch.commands[i].id == command.id) {
-                        batch.commands[i].used = command.used;
+                for (let i = 0; i < commands.length; i++) {
+                    if (commands[i].id == command.id) {
+                        commands[i].used = command.used;
+                        await db.overwriteObjectInArray('commands', 'id', command.id, command);
                     }
                 }
                 return await variableCheck(response, chat, command)
@@ -673,9 +620,10 @@ async function handleCommand(chat, command) {
                 } else {
                     command.used = 1;
                 }
-                for (let i = 0; i < batch.commands.length; i++) {
-                    if (batch.commands[i].id == command.id) {
-                        batch.commands[i].used = command.used;
+                for (let i = 0; i < commands.length; i++) {
+                    if (commands[i].id == command.id) {
+                        commands[i].used = command.used;
+                        await db.overwriteObjectInArray('commands', 'id', command.id, command);
                     }
                 }
                 return await variableCheck(response, chat, command)
@@ -685,25 +633,26 @@ async function handleCommand(chat, command) {
 }
 
 async function handleCounting(chat) {
-    batch.counting.messages.push(chat);
-    if (batch.counting.messages.length + 1 > 50) {
-        batch.counting.messages.shift();
+    let counting = await db.getOne('counting');
+    counting.messages.push(chat);
+    if (counting.messages.length + 1 > 50) {
+        counting.messages.shift();
     }
-    batch.counting.number++;
-    batch.counting.lastMSG = chat.timestampUsec;
-    if (batch.counting.users) {
+    counting.number++;
+    counting.lastMSG = chat.timestampUsec;
+    if (counting.users) {
         let found = false;
-        for (let i = 0; i < batch.counting.users.length; i++) {
-            if (batch.counting.users[i].id == chat.authorChannelId) {
-                batch.counting.users[i].count++;
-                batch.counting.users[i].name = chat.authorName;
-                batch.counting.users[i].image = chat.authorPhoto;
+        for (let i = 0; i < counting.users.length; i++) {
+            if (counting.users[i].id == chat.authorChannelId) {
+                counting.users[i].count++;
+                counting.users[i].name = chat.authorName;
+                counting.users[i].image = chat.authorPhoto;
                 found = true;
                 break;
             }
         }
         if (found == false) {
-            batch.counting.users.push({
+            counting.users.push({
                 id: chat.authorChannelId,
                 name: chat.authorName,
                 image: chat.authorPhoto,
@@ -711,6 +660,7 @@ async function handleCounting(chat) {
             });
         }
     }
+    await db.overwriteOne('counting', counting);
     return "";
 }
 
@@ -761,23 +711,28 @@ async function handleGiveaway(chat) {
     }
     async function enter() {
         giveaway.entries.push(chat.authorChannelId);
-        db.updateOne('giveaway', giveaway);
+        await db.updateOne('giveaway', giveaway);
         sendMSG(author.name + ", you have been entered into the giveaway")
     }
 }
 
 async function variableCheck(response, msg, cmd) {
+    let commands = await db.getOne('commands');
+    let connection = await db.getOne('connection');
+    let users = await db.getOne('users');
+    let votes = await db.getOne('votes');
+    response = response.replace(/{query}/g, stringify(msg.message).split(' ').slice(1).join(' '));
     return checkVariables();
     async function checkVariables() {
-        if ((response.includes('{addCommand')) && (response != "{deleteCommand") && (response != "{editCommand")) {
+        if ((response.includes('{addCommand')) || (response.includes('{deleteCommand')) || (response.includes('{editCommand'))) {
             if (response.includes('{addCommand')) {
                 response = await response.replace(/\{addCommand\s*([^{}]+)\}/g, (match, expr) => {
                     try {
                         let command = expr.split(' ')[0];
                         let response2 = expr.split(' ').slice(1).join(' ');
                         let found = false;
-                        for (let i = 0; i < batch.commands.length; i++) {
-                            if (batch.commands[i].command == command) {
+                        for (let i = 0; i < commands.length; i++) {
+                            if (commands[i].command == command) {
                                 found = true;
                                 break;
                             }
@@ -786,15 +741,15 @@ async function variableCheck(response, msg, cmd) {
                             let randomStr8 = Math.random().toString(36).substring(7);
                             redo()
                             async function redo() {
-                                for (let i = 0; i < batch.commands.length; i++) {
-                                    if (batch.commands[i].id == randomStr8) {
+                                for (let i = 0; i < commands.length; i++) {
+                                    if (commands[i].id == randomStr8) {
                                         randomStr8 = Math.random().toString(36).substring(7);
                                         redo()
                                         break;
                                     }
                                 }
                             }
-                            batch.commands.push({
+                            db.addTo('commands', {
                                 id: randomStr8,
                                 command: command,
                                 response: response2,
@@ -814,18 +769,21 @@ async function variableCheck(response, msg, cmd) {
                 });
             }
             if (response.includes('{deleteCommand')) {
+                console.log(3)
                 response = await response.replace(/\{deleteCommand\s*([^{}]+)\}/g, (match, expr) => {
+                    console.log(4)
                     try {
                         let command = expr.split(' ')[0];
                         let found = false;
-                        for (let i = 0; i < batch.commands.length; i++) {
-                            if (batch.commands[i].command == command) {
+                        for (let i = 0; i < commands.length; i++) {
+                            if (commands[i].command == command) {
                                 found = true;
                                 break;
                             }
                         }
                         if (found) {
-                            batch.commands = batch.commands.filter((cmd) => cmd.id != command.id);
+                            commands = commands.filter((cmd) => cmd.id != command.id);
+                            db.removeObject('commands', 'id', command.id);
                             return `removed ${command}`;
                         } else {
                             return `${command} does not exist`;
@@ -843,18 +801,19 @@ async function variableCheck(response, msg, cmd) {
                         let response2 = expr.split(' ').slice(1).join(' ');
                         let found = false;
                         let u;
-                        for (let i = 0; i < batch.commands.length; i++) {
-                            if (batch.commands[i].command == command) {
-                                u = batch.commands[i];
+                        for (let i = 0; i < commands.length; i++) {
+                            if (commands[i].command == command) {
+                                u = commands[i];
                                 u.response = response2;
                                 found = true;
                                 break;
                             }
                         }
                         if (found) {
-                            for (let i = 0; i < batch.commands.length; i++) {
-                                if (batch.commands[i].id == u.id) {
-                                    batch.commands[i] = u;
+                            for (let i = 0; i < commands.length; i++) {
+                                if (commands[i].id == u.id) {
+                                    commands[i] = u;
+                                    db.overwriteObjectInArray('commands', 'id', u.id, u);
                                     break;
                                 }
                             }
@@ -869,11 +828,10 @@ async function variableCheck(response, msg, cmd) {
                 });
             }
         } else {
-            response = response.replace(/{query}/g, stringify(msg.message).split(' ').slice(1).join(' '));
-            response = response.replace(/{ownerName}/g, batch.connection.channel.snippet.title);
-            response = response.replace(/{ownerId}/g, batch.connection.channel.id);
-            response = response.replace(/{ownerUrl}/g, batch.connection.channel.customUrl);
-            response = response.replace(/{ownerDescription}/g, batch.connection.channel.snippet.description);
+            response = response.replace(/{ownerName}/g, connection.channel.snippet.title);
+            response = response.replace(/{ownerId}/g, connection.channel.id);
+            response = response.replace(/{ownerUrl}/g, connection.channel.customUrl);
+            response = response.replace(/{ownerDescription}/g, connection.channel.snippet.description);
             response = response.replace(/{authorName}/g, msg.authorName);
             response = response.replace(/{messageId}/g, msg.id);
             response = response.replace(/{messageTimestamp}/g, msg.timestampUsec);
@@ -897,8 +855,8 @@ async function variableCheck(response, msg, cmd) {
             let authorMessages = 0
             let authorXP = 0
             let authorCustomRole = ""
-            if (batch.users.find((user) => user.id == msg.authorChannelId)) {
-                let author = batch.users.find((user) => user.id == msg.authorChannelId);
+            if (users.find((user) => user.id == msg.authorChannelId)) {
+                let author = users.find((user) => user.id == msg.authorChannelId);
                 if (author) {
                     authorXP = author.xp ? author.xp : 0;
                     authorPoints = author.points;
@@ -917,7 +875,7 @@ async function variableCheck(response, msg, cmd) {
                     try {
                         let quote = expr
                         let id = Math.random().toString(36).substring(7);
-                        batch.quotes.push({
+                        db.addTo('quotes', {
                             quote: quote,
                             id: id,
                             time: Date.now(),
@@ -936,10 +894,10 @@ async function variableCheck(response, msg, cmd) {
                         let vote = expr
                         let found = false;
                         let u;
-                        for (let i = 0; i < batch.votes.length; i++) {
-                            if (batch.votes[i].name == vote.toLowerCase()) {
+                        for (let i = 0; i < votes.length; i++) {
+                            if (votes[i].name == vote.toLowerCase()) {
                                 found = true;
-                                u = batch.votes[i];
+                                u = votes[i];
                                 break;
                             }
                         }
@@ -954,27 +912,27 @@ async function variableCheck(response, msg, cmd) {
                     response = await response.replace(/\{vote\s*([^{}]+)\}/g, (match, expr) => {
                         let vote = expr
                         let found = false;
-                        for (let i = 0; i < batch.users.length; i++) {
-                            if (batch.users[i].name.toLowerCase() == vote.toLowerCase()) {
-                                if ((!batch.users[i].xp) || (batch.users[i].xp == null) || (batch.users[i].xp == undefined) || (isNaN(batch.users[i].xp))) {
-                                    batch.users[i].xp = 0;
+                        for (let i = 0; i < users.length; i++) {
+                            if (users[i].name.toLowerCase() == vote.toLowerCase()) {
+                                if ((!users[i].xp) || (users[i].xp == null) || (users[i].xp == undefined) || (isNaN(users[i].xp))) {
+                                    users[i].xp = 0;
                                 }
-                                //triple
-                                batch.users[i].xp += 15;
+                                users[i].xp += 15;
                                 break;
                             }
                         }
-                        for (let i = 0; i < batch.votes.length; i++) {
-                            if (batch.votes[i].name == vote.toLowerCase()) {
+                        for (let i = 0; i < votes.length; i++) {
+                            if (votes[i].name == vote.toLowerCase()) {
                                 found = true;
-                                batch.votes[i].votes += 1;
+                                votes[i].votes += 1;
+                                db.overwriteObjectInArray('votes', 'name', vote.toLowerCase(), votes[i]);
                                 break;
                             }
                         }
                         if (found) {
                             return `${vote}`;
                         } else if (vote) {
-                            batch.votes.push({
+                            db.addTo('votes', {
                                 name: vote.toLowerCase(),
                                 votes: 1
                             });
@@ -994,7 +952,7 @@ async function variableCheck(response, msg, cmd) {
                 }
             }
             if (response.includes('{authorDaily}')) {
-                let things = [...batch.users];
+                let things = JSON.parse(JSON.stringify(users));
                 let author = things.find((user) => user.id == msg.authorChannelId);
                 let gain = {
                     points: author.points,
@@ -1015,7 +973,7 @@ async function variableCheck(response, msg, cmd) {
                 response = response.replace(/{authorDaily}/g, "Points: " + gain.points + ", Messages: " + gain.messages + ", Hours: " + gain.hours);
             }
             if (response.includes('{authorWeekly}')) {
-                let things = [...batch.users];
+                let things = JSON.parse(JSON.stringify(users));
                 let author = things.find((user) => user.id == msg.authorChannelId);
                 let gain = {
                     points: author.points,
@@ -1036,7 +994,7 @@ async function variableCheck(response, msg, cmd) {
                 response = response.replace(/{authorWeekly}/g, "Points: " + gain.points + ", Messages: " + gain.messages + ", Hours: " + gain.hours);
             }
             if (response.includes('{authorMonthly}')) {
-                let things = [...batch.users];
+                let things = JSON.parse(JSON.stringify(users));
                 let author = things.find((user) => user.id == msg.authorChannelId);
                 let gain = {
                     points: author.points,
@@ -1106,7 +1064,7 @@ async function variableCheck(response, msg, cmd) {
                         return "You can only write to wall.txt"
                     }
                 }
-            }
+            }/*
             if (response.includes('{warn ')) {
                 response = await nextThing()
                 async function nextThing() {
@@ -1117,22 +1075,22 @@ async function variableCheck(response, msg, cmd) {
                         let userID = "";
                         let reason = message.split(' | ')[0];
                         let total = 0;
-                        for (let i = 0; i < batch.users.length; i++) {
-                            if ((batch.users[i].name.toLowerCase() == user.toLowerCase()) || (batch.users[i].id == user)) {
+                        for (let i = 0; i < users.length; i++) {
+                            if ((users[i].name.toLowerCase() == user.toLowerCase()) || (users[i].id == user)) {
                                 return await nextThing2(i)
                                 async function nextThing2(i) {
-                                    username = batch.users[i].name;
-                                    userID = batch.users[i].id;
-                                    if (batch.users[i].warnings) {
-                                        batch.users[i].warnings.push({
+                                    username = users[i].name;
+                                    userID = users[i].id;
+                                    if (users[i].warnings) {
+                                        users[i].warnings.push({
                                             reason: reason,
                                             time: Date.now(),
                                             mod: msg.authorName
                                         });
-                                        total = batch.users[i].warnings.length;
+                                        total = users[i].warnings.length;
                                         found = true;
                                     } else {
-                                        batch.users[i].warnings = [{
+                                        users[i].warnings = [{
                                             reason: reason,
                                             time: Date.now(),
                                             mod: msg.authorName
@@ -1140,7 +1098,7 @@ async function variableCheck(response, msg, cmd) {
                                         total = 1;
                                         found = true;
                                     }
-                                    if (!batch.users[i].channelID) {
+                                    if (!users[i].channelID) {
                                         await fetch(webhook3, {
                                             "headers": {
                                                 "Accept": "application/json",
@@ -1161,13 +1119,13 @@ async function variableCheck(response, msg, cmd) {
                                             "method": "POST",
                                             "mode": "cors"
                                         }).then(res => res.json()).then(data => {
-                                            batch.users[i]['channelID'] = data.channel_id;
+                                            users[i]['channelID'] = data.channel_id;
                                             return `warned ${username}, ${total}`
                                         }).catch(err => {
                                             console.log(err)
                                         })
                                     } else {
-                                        await fetch(webhook3 + "?thread_id=" + batch.users[i].channelID, {
+                                        await fetch(webhook3 + "?thread_id=" + users[i].channelID, {
                                             "headers": {
                                                 "Accept": "application/json",
                                                 "Content-Type": "application/json",
@@ -1198,36 +1156,27 @@ async function variableCheck(response, msg, cmd) {
                         return "@" + msg.authorName + ", Please provide the name/id and a reason."
                     }
                 }
-            }
+            }*/
         }
         //console.log(response)
         return await sendMSG(response);
     }
 }
 
-mc.on("error", (error) => {
-    console.error(error);
-});
-
-mc.on("end", () => {
-    console.log("Connection closed");
-    process.exit();
-});
-
 async function updateEverything() {
-    let pointGainers = [];
-    let milestoneMessages = [];
     let users = await db.getOne('users');
     let settings = await db.getOne('settings');
+    console.log(settings)
+    let pointGainers = [];
+    let milestoneMessages = [];
     if (settings.currency.enabled == true) {
         for (let i = 0; i < users.length; i++) {
             if (users[i].active == true) {
-                if ((users[i].id != process.argv[4])) {
+                if ((users[i].id != bot)) {
                     users[i].points = (parseFloat(users[i].points) + 1)
                     if ((!users[i].xp) || (users[i].xp == NaN) || (users[i].xp == undefined) || (users[i].xp == null)) {
                         users[i].xp = 0;
                     }
-                    //triple
                     users[i].xp = (parseFloat(users[i].xp) + (Math.floor(Math.random() * 5) + 1) * 3);
                     users[i].active = false;
                     if (checkmilestone(parseInt(users[i].points))) {
@@ -1235,13 +1184,16 @@ async function updateEverything() {
                     }
                     users[i].hours = users[i].points / 12;
                     pointGainers.push(users[i].name);
+                    if (!users[i].dailyStats) {
+                        users[i].dailyStats = {};
+                    }
                     users[i].dailyStats[`${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`] = {
                         messages: users[i].messages,
                         points: users[i].points,
                         xp: users[i].xp
                     }
                 } else {
-                    if (users[i].id == process.argv[4]) {
+                    if (users[i].id == bot) {
                         users[i].points = 0;
                         users[i].active = false;
                         users[i].hours = 0;
@@ -1252,6 +1204,9 @@ async function updateEverything() {
                 if ((!users[i].xp) || (users[i].xp == NaN) || (users[i].xp == undefined) || (users[i].xp == null)) {
                     users[i].xp = 0;
                 }
+                if (!users[i].hourlyStats) {
+                    users[i].hourlyStats = {};
+                }
                 users[i].hourlyStats[parseInt(new Date().getHours())] = {
                     messages: users[i].messages,
                     points: users[i].points,
@@ -1259,13 +1214,13 @@ async function updateEverything() {
                 }
             }
         }
-        db.overwriteOne('users', users);
+        await db.overwriteOne('users', users);
         if (pointGainers.length > 0) {
             sendMSG(`${new Date().toString().split('GMT')[0]}: ${pointGainers.length} users have gained 1 point (${pointGainers})`);
             for (let i = 0; i < milestoneMessages.length; i++) {
                 sendMSG(milestoneMessages[i]);
             }
-            let Child = fork('backup.js', [process.argv[2]]);
+            let Child = fork('backup.js', [id]);
             Child.on('exit', (code) => {
                 console.log(`Points child exited with code ${code}`);
             });
@@ -1273,31 +1228,6 @@ async function updateEverything() {
         console.log(`${new Date()}: ${pointGainers.length} users have gained 1 point (${pointGainers})`)
     }
 }
-
-/*setTimeout(async () => {
-    let users = await db.getOne('users');
-    for (let i = 0; i < users.length; i++) {
-        if (users[i].dailyStats) {
-            let keys = Object.keys(users[i].dailyStats);
-            let lastKey = keys[keys.length - 3];
-            if (users[i].dailyStats[lastKey]) {
-                if (users[i].dailyStats[lastKey].xp) {
-                    if (users[i].xp > 1000000) {
-                        lastKey = keys[keys.length - 4];
-                    }
-                    users[i].xp = users[i].dailyStats[lastKey].xp;
-                } else {
-                    users[i].xp = 0;
-                }
-            } else {
-                users[i].xp = 0;
-            }
-        } else {
-            users[i].xp = 0;
-        }
-    }
-    db.overwriteOne('users', users);
-}, 1000)*/
 
 setInterval(async () => {
     let timers = await db.getOne('timers');
@@ -1308,7 +1238,7 @@ setInterval(async () => {
         let difference = currentTime - lastCalled;
         if (difference >= interval) {
             timers[i].lastCalled = currentTime;
-            db.editWithinArray('timers', 'name', timers[i].name, 'lastCalled', currentTime)
+            await db.editWithinArray('timers', 'name', timers[i].name, 'lastCalled', currentTime)
             sendMSG(timers[i].text);
         }
     }
@@ -1329,26 +1259,25 @@ async function sendMSG(message) {
                 }
                 messages.push(message);
                 for (let i = 0; i < messages.length; i++) {
-                    mc.sendMessage(messages[i]).catch((error) => {
-                        //console.log(error)
-                        //sendMSG(messages[i])
-                    })
+                    mc.sendMessage(messages[i]).catch((error) => { })
                 }
-                return
+                return;
             } else {
                 message = message.toString()
-                mc.sendMessage(message).catch((error) => {
-                    //console.log(error)
-                    //sendMSG(message)
-                })
-                return
+                mc.sendMessage(message).catch((error) => { })
+                return;
             }
         } else {
-            return ""
+            return "";
         }
     } else {
-        return ""
+        return "";
     }
 }
 
-mc.listen();
+export default {
+    action,
+    startBot,
+    stopBot,
+    isLive
+}

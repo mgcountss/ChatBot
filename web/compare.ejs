@@ -1,7 +1,7 @@
 <html>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-<link rel="stylesheet" href="../../../odometer.css">
-<script src="../../../odometer.js"></script>
+<link rel="stylesheet" href="/file/odometer.css">
+<script src="/file/odometer.js"></script>
 <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;1,400&amp;display=swap">
 <script src="https://code.highcharts.com/10.3.3/highcharts.js"></script>
@@ -992,14 +992,16 @@
             marker: { enabled: false },
             color: '#FFF',
             lineColor: '#FFF',
-            lineWidth: 2
+            lineWidth: 2,
+            data: user1_chartData1
         }, {
             showInLegend: true,
             name: '<%=user2.name%> Points',
             marker: { enabled: false },
             color: '#FFF',
             lineColor: '#FFF',
-            lineWidth: 2
+            lineWidth: 2,
+            data: user2_chartData1
         }]
     });
 
@@ -1044,14 +1046,16 @@
             marker: { enabled: false },
             color: '#FFF',
             lineColor: '#FFF',
-            lineWidth: 2
+            lineWidth: 2,
+            data: user1_chartData2
         }, {
             showInLegend: true,
             name: '<%=user2.name%> Messages',
             marker: { enabled: false },
             color: '#FFF',
             lineColor: '#FFF',
-            lineWidth: 2
+            lineWidth: 2,
+            data: user2_chartData2
         }]
     });
 
@@ -1096,14 +1100,16 @@
             marker: { enabled: false },
             color: '#FFF',
             lineColor: '#FFF',
-            lineWidth: 2
+            lineWidth: 2,
+            data: user1_chartData4
         }, {
             showInLegend: true,
             name: '<%=user2.name%> XP',
             marker: { enabled: false },
             color: '#FFF',
             lineColor: '#FFF',
-            lineWidth: 2
+            lineWidth: 2,
+            data: user2_chartData4
         }]
     });
 
