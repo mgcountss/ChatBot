@@ -21,10 +21,10 @@ if (!fs.existsSync('./user')) {
     fs.mkdirSync('./user');
     fs.writeFileSync('./user/key.json', JSON.stringify({}));
 }
-let chat = await await db.getOne('messages');
+let chat = await db.getOne('messages');
 let currency = [];
 setInterval(async () => {
-    chat = await await db.getOne('messages')
+    chat = await db.getOne('messages')
 }, 5000)
 
 const logRoute = (req, res) => {
@@ -36,7 +36,7 @@ const logRoute = (req, res) => {
 app.get('/api/view/counting', async (req, res) => {
     logRoute(req, res)
     try {
-        let counting = await await db.getOne('counting')
+        let counting = await db.getOne('counting')
         if (counting) {
             if (!counting.messages) {
                 restoreLastBackup()
@@ -60,7 +60,7 @@ app.get('/api/view/counting', async (req, res) => {
 
 app.get('/api/view/giveaway', async (req, res) => {
     logRoute(req, res)
-    let currentGiveaway = await await db.getOne('giveaway')
+    let currentGiveaway = await db.getOne('giveaway')
     if (currentGiveaway) {
         if (currentGiveaway.entries) {
             for (let i = 0; i < currentGiveaway.entries.length; i++) {
@@ -78,7 +78,7 @@ app.get('/api/view/giveaway', async (req, res) => {
 
 app.get('/api/view/logs', async (req, res) => {
     logRoute(req, res)
-    let logs = await await db.getOne('messages')
+    let logs = await db.getOne('messages')
     if (logs) {
         let things = [...logs];
         things = things.reverse();
@@ -91,9 +91,9 @@ app.get('/api/view/logs', async (req, res) => {
 
 app.get('/api/view/totals', async (req, res) => {
     logRoute(req, res)
-    let users = await await db.getOne('users')
-    let stream = await await db.getOne('stream')
-    let votes = await await db.getOne('votes')
+    let users = await db.getOne('users')
+    let stream = await db.getOne('stream')
+    let votes = await db.getOne('votes')
     if (users && stream && votes) {
         let messages = stream.messages;
         let points = 0;
@@ -151,7 +151,7 @@ app.get('/api/view/chat', async (req, res) => {
 
 app.get('/api/view/votes', async (req, res) => {
     logRoute(req, res)
-    let votes = await await db.getOne('votes')
+    let votes = await db.getOne('votes')
     if (votes) {
         res.send(votes)
     } else {
@@ -172,7 +172,9 @@ app.get('/api/view/any', async (req, res) => {
         }
     }
     if ((req.query.type == "users") || (req.query.type == "gain") || (req.query.type == "points")) {
-        let users = await await db.getOne('users')
+        let users = await db.getOne('users');
+        users = JSON.parse(JSON.stringify(users));
+
         if (users) {
             let things = [...users];
             if (things) {
@@ -234,7 +236,7 @@ app.get('/api/view/any', async (req, res) => {
             res.send('Error')
         }
     } else if (req.query.type == "votes") {
-        let votes = await await db.getOne('votes')
+        let votes = await db.getOne('votes')
         votes = votes.sort((a, b) => {
             return parseFloat(b.votes) - parseFloat(a.votes)
         });
@@ -259,7 +261,7 @@ app.get('/api/view/any', async (req, res) => {
 app.post('/api/view/search', async (req, res) => {
     logRoute(req, res)
     if (req.body.search == undefined) return res.send('Error' + req.body.search)
-    let users = await await db.getOne('users')
+    let users = await db.getOne('users')
     if (users) {
         let things = [...users];
         let query = req.body.search.toLowerCase();
@@ -284,8 +286,8 @@ app.post('/api/edit/giveaway', async (req, res) => {
     logRoute(req, res)
     if (req.body.prize && req.body.entryRank && req.body.requirementAmount && req.body.requirementType && req.body.command) {
         if (req.cookies['chatbot']) {
-            if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
-                let currentGiveaway = await await db.getOne('giveaway')
+            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await db.getOne('giveaway')
                 let giveaway = {
                     enabled: currentGiveaway.enabled,
                     winner: currentGiveaway.winner,
@@ -306,8 +308,8 @@ app.post('/api/edit/giveaway', async (req, res) => {
         }
     } else if (req.body.clear) {
         if (req.cookies['chatbot']) {
-            if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
-                let currentGiveaway = await await db.getOne('giveaway')
+            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await db.getOne('giveaway')
                 currentGiveaway.entries = [];
                 currentGiveaway.winner = '';
                 currentGiveaway.enabled = false;
@@ -319,8 +321,8 @@ app.post('/api/edit/giveaway', async (req, res) => {
         }
     } else if (req.body.reroll) {
         if (req.cookies['chatbot']) {
-            if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
-                let currentGiveaway = await await db.getOne('giveaway')
+            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await db.getOne('giveaway')
                 currentGiveaway.winner = '';
                 let winner = currentGiveaway.entries[Math.floor(Math.random() * currentGiveaway.entries.length)];
                 currentGiveaway.winner = winner;
@@ -332,8 +334,8 @@ app.post('/api/edit/giveaway', async (req, res) => {
         }
     } else if (req.body.start) {
         if (req.cookies['chatbot']) {
-            let currentGiveaway = await await db.getOne('giveaway')
-            if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+            let currentGiveaway = await db.getOne('giveaway')
+            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
                 currentGiveaway.enabled = true;
                 await db.overwriteOne('giveaway', currentGiveaway)
                 res.send({ success: true })
@@ -343,8 +345,8 @@ app.post('/api/edit/giveaway', async (req, res) => {
         }
     } else if (req.body.stop) {
         if (req.cookies['chatbot']) {
-            if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
-                let currentGiveaway = await await db.getOne('giveaway')
+            if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
+                let currentGiveaway = await db.getOne('giveaway')
                 currentGiveaway.enabled = false;
                 let winner = currentGiveaway.entries[Math.floor(Math.random() * currentGiveaway.entries.length)];
                 currentGiveaway.winner = winner;
@@ -362,8 +364,8 @@ app.post('/api/edit/giveaway', async (req, res) => {
 app.post('/api/edit/timer', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let timers = await await db.getOne('timers')
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let timers = await db.getOne('timers')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.id && req.body.text && req.body.interval && req.body.enabled) {
                 if (isNaN(parseFloat(req.body.interval))) {
                     res.status(400).send({
@@ -422,8 +424,8 @@ app.post('/api/edit/timer', async (req, res) => {
 app.post('/api/edit/command', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let commands = await await db.getOne('commands')
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let commands = await db.getOne('commands')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.name && req.body.response && req.body.rank && req.body.cooldown) {
                 if (req.body.name.includes(' ')) {
                     res.status(400).send({
@@ -497,7 +499,7 @@ app.post('/api/edit/user', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
         let users = currency
-        let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
         if (userID) {
             let subject = users.find(x => x.id == req.body.id);
             if (subject) {
@@ -536,7 +538,7 @@ app.post('/api/remove/user', async (req, res) => {
     logRoute(req, res)
     if (req.body.id == undefined) return res.send('Error')
     if (req.cookies['chatbot']) {
-        let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
         if (userID) {
             await db.deleteFromArray('users', 'id', req.body.id)
             res.send({ success: true })
@@ -551,8 +553,8 @@ app.post('/api/remove/user', async (req, res) => {
 app.post('/api/remove/timer', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let timers = await await db.getOne('timers')
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let timers = await db.getOne('timers')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.id) {
                 for (let i = 0; i < timers.length; i++) {
                     if (timers[i].id == req.body.id) {
@@ -590,8 +592,8 @@ app.post('/api/remove/timer', async (req, res) => {
 app.post('/api/remove/command', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let commands = await await db.getOne('commands')
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let commands = await db.getOne('commands')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.name) {
                 for (let i = 0; i < commands.length; i++) {
                     if (commands[i].command == req.body.name) {
@@ -632,8 +634,8 @@ app.post('/api/remove/command', async (req, res) => {
 app.post('/api/add/timer', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let timers = await await db.getOne('timers')
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let timers = await db.getOne('timers')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.text && req.body.interval) {
                 if (isNaN(parseFloat(req.body.interval))) {
                     res.status(400).send({
@@ -692,8 +694,8 @@ app.post('/api/add/timer', async (req, res) => {
 app.post('/api/add/command', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let commands = await await db.getOne('commands')
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let commands = await db.getOne('commands')
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (req.body.name && req.body.response && req.body.rank && req.body.cooldown) {
                 if (req.body.name.includes(' ')) {
                     res.status(400).send({
@@ -783,13 +785,13 @@ app.get('/dashboard', async (req, res) => {
     let key = ""
     if (req.cookies['chatbot']) {
         key = req.cookies['chatbot']
-        let real = await await db.findUserIdFromToken(req.cookies['chatbot']);
+        let real = await db.findUserIdFromToken(req.cookies['chatbot']);
         if (!real) {
             res.clearCookie('chatbot');
             res.redirect('/dashboard')
         }
     }
-    let settings = await await db.getOne('settings')
+    let settings = await db.getOne('settings')
     if (settings == undefined) {
         res.redirect('/connect')
         return;
@@ -797,18 +799,18 @@ app.get('/dashboard', async (req, res) => {
     if (settings == {}) {
         restoreLastBackup()
     }
-    let userAuth = await await db.findUserIdFromToken(req.cookies['chatbot']);
-    let commands = await await db.getOne('commands')
-    let connection = await await db.getOne('connection')
-    let counting = await await db.getOne('counting')
-    let giveaway = await await db.getOne('giveaway')
-    let messages = await await db.getOne('messages')
-    let moderation = await await db.getOne('moderation')
-    let quotes = await await db.getOne('quotes')
-    let stream = await await db.getOne('stream')
-    let timers = await await db.getOne('timers')
-    let users = await await db.getOne('users')
-    let votes = await await db.getOne('votes')
+    let userAuth = await db.findUserIdFromToken(req.cookies['chatbot']);
+    let commands = await db.getOne('commands')
+    let connection = await db.getOne('connection')
+    let counting = await db.getOne('counting')
+    let giveaway = await db.getOne('giveaway')
+    let messages = await db.getOne('messages')
+    let moderation = await db.getOne('moderation')
+    let quotes = await db.getOne('quotes')
+    let stream = await db.getOne('stream')
+    let timers = await db.getOne('timers')
+    let users = await db.getOne('users')
+    let votes = await db.getOne('votes')
     let user = {
         id: connection.channel.id,
         commands: commands,
@@ -834,7 +836,7 @@ app.get('/dashboard', async (req, res) => {
 app.get('/connect', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
         if (userID) {
             res.redirect('/restore')
         } else {
@@ -859,7 +861,7 @@ app.get('/login/:token', async (req, res) => {
 app.get('/restore', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
         if (userID) {
             let backups = fs.readdirSync('./user/archives');
             backups.sort(function (a, b) {
@@ -884,7 +886,7 @@ app.post('/restore/:date', async (req, res) => {
     try {
         logRoute(req, res)
         if (req.cookies['chatbot']) {
-            let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
+            let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
             if (userID) {
                 let backups = fs.readdirSync('./user/archives');
                 if (backups.includes(req.params.date)) {
@@ -1219,7 +1221,7 @@ app.post('/api/checkforstream', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
         console.log('has cookies')
-        let userID = await await db.findUserIdFromToken(req.cookies['chatbot']);
+        let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
         if (userID) {
             console.log('is logged in')
             endStream()
@@ -1239,7 +1241,7 @@ app.post('/api/checkforstream', async (req, res) => {
 app.post('/api/chat/deleteMsg', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let stream = await await db.getOne('stream');
+        let stream = await db.getOne('stream');
         if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             let index = livechats.findIndex((stream2) => {
                 return stream2 == stream.id;
@@ -1273,8 +1275,8 @@ app.post('/api/chat/deleteMsg', async (req, res) => {
 app.post('/api/chat/timeout', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let stream = await await db.getOne('stream');
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let stream = await db.getOne('stream');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             let index = livechats.findIndex((stream2) => {
                 return stream2 == stream.id;
             });
@@ -1299,8 +1301,8 @@ app.post('/api/chat/timeout', async (req, res) => {
 app.post('/api/chat/ban', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let stream = await await db.getOne('stream');
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let stream = await db.getOne('stream');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             let index = livechats.findIndex((stream2) => {
                 return stream2 == stream.id;
             });
@@ -1327,8 +1329,8 @@ app.post('/api/chat/ban', async (req, res) => {
 app.post('/api/settings/moderation', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let moderation = await await db.getOne('moderation');
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let moderation = await db.getOne('moderation');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             moderation = req.body.moderation;
             await db.overwriteOne('moderation', moderation);
             res.status(200).send({
@@ -1351,9 +1353,9 @@ app.post('/api/settings/moderation', async (req, res) => {
 app.get('/api/settings/enable', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let settings = await await db.getOne('settings');
-        let stream = await await db.getOne('stream');
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let settings = await db.getOne('settings');
+        let stream = await db.getOne('stream');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (settings.chatbot.enabled == false) {
                 settings.chatbot.enabled = true;
                 await db.overwriteOne('settings', settings);
@@ -1387,8 +1389,8 @@ app.get('/api/settings/enable', async (req, res) => {
 app.get('/api/settings/counting', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let settings = await await db.getOne('settings');
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let settings = await db.getOne('settings');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (settings.counting.enabled) {
                 settings.counting.enabled = false;
                 await db.overwriteOne('settings', settings);
@@ -1421,8 +1423,8 @@ app.get('/api/settings/counting', async (req, res) => {
 app.get('/api/settings/currency', async (req, res) => {
     logRoute(req, res)
     if (req.cookies['chatbot']) {
-        let settings = await await db.getOne('settings');
-        if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+        let settings = await db.getOne('settings');
+        if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
             if (settings.currency.enabled) {
                 settings.currency.enabled = false;
                 await db.overwriteOne('settings', settings);
@@ -1449,7 +1451,7 @@ app.get('/api/settings/currency', async (req, res) => {
 
 app.get('/filestore/:file', async (req, res) => {
     logRoute(req, res)
-    if (await await db.findUserIdFromToken(req.cookies['chatbot'])) {
+    if (await db.findUserIdFromToken(req.cookies['chatbot'])) {
         let userDir = "./user/files"
         let file = req.params.file;
         let path = userDir + "/" + file;
@@ -1500,163 +1502,171 @@ app.get('/public/compare/search', async (req, res) => {
 });
 
 app.get('/public/compare', async (req, res) => {
-    logRoute(req, res);
-    let user1 = req.query.id1;
-    let user2 = req.query.id2;
-    if (!user1 || !user2) {
-        res.status(400).send({
-            error: 'Missing user(s)',
-            success: false
-        });
-        return;
-    }
-    if (user1 == user2) {
-        res.status(400).send({
-            error: 'Cannot compare the same user',
-            success: false
-        });
-        return;
-    }
-    let users = currency
-    let user1Data = users.find(x => x.id == user1);
-    let user2Data = users.find(x => x.id == user2);
-    let dailyKeys1 = Object.keys(user1Data.dailyStats);
     try {
-        user1Data.daily = {
-            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 2]].points),
-            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 2]].messages),
-            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 2]].xp)
+        logRoute(req, res);
+        let user1 = req.query.id1;
+        let user2 = req.query.id2;
+        if (!user1 || !user2) {
+            res.status(400).send({
+                error: 'Missing user(s)',
+                success: false
+            });
+            return;
         }
-    } catch (err) {
-        user1Data.daily = {
-            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].points),
-            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].messages),
-            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].xp)
+        if (user1 == user2) {
+            res.status(400).send({
+                error: 'Cannot compare the same user',
+                success: false
+            });
+            return;
         }
-    }
-    try {
-        user1Data.weekly = {
-            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 8]].points),
-            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 8]].messages),
-            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 8]].xp)
-        }
-    } catch (err) {
-        user1Data.weekly = {
-            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].points),
-            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].messages),
-            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].xp)
-        }
-    }
-    try {
-        user1Data.monthly = {
-            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 31]].points),
-            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 31]].messages),
-            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 31]].xp)
-        }
-    } catch (err) {
-        user1Data.monthly = {
-            points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].points),
-            messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].messages),
-            xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].xp)
-        }
-    }
-    if (user1Data.lastMSG) {
-        if ((Date.now() * 1000) - (user1Data.lastMSG) > 86400000000) {
+        let users = currency
+        let user1Data = users.find(x => x.id == user1);
+        let user2Data = users.find(x => x.id == user2);
+        let dailyKeys1 = Object.keys(user1Data.dailyStats);
+        try {
             user1Data.daily = {
-                points: 0,
-                messages: 0,
-                xp: 0
+                points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 2]].points),
+                messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 2]].messages),
+                xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 2]].xp)
+            }
+        } catch (err) {
+            user1Data.daily = {
+                points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].points),
+                messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].messages),
+                xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].xp)
             }
         }
-        if ((Date.now() * 1000) - (user1Data.lastMSG) > 604800000000000) {
+        try {
             user1Data.weekly = {
-                points: 0,
-                messages: 0,
-                xp: 0
+                points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 8]].points),
+                messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 8]].messages),
+                xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 8]].xp)
+            }
+        } catch (err) {
+            user1Data.weekly = {
+                points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].points),
+                messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].messages),
+                xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].xp)
             }
         }
-        if ((Date.now() * 1000) - (user1Data.lastMSG) > 2592000000000) {
+        try {
             user1Data.monthly = {
-                points: 0,
-                messages: 0,
-                xp: 0
+                points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 31]].points),
+                messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 31]].messages),
+                xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 31]].xp)
+            }
+        } catch (err) {
+            user1Data.monthly = {
+                points: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].points) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].points),
+                messages: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].messages) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].messages),
+                xp: parseFloat(user1Data.dailyStats[dailyKeys1[dailyKeys1.length - 1]].xp) - parseFloat(user1Data.dailyStats[dailyKeys1[0]].xp)
             }
         }
-    }
-    let dailyKeys2 = Object.keys(user2Data.dailyStats);
-    try {
-        user2Data.daily = {
-            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 2]].points),
-            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 2]].messages),
-            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 2]].xp)
+        if (user1Data.lastMSG) {
+            if ((Date.now() * 1000) - (user1Data.lastMSG) > 86400000000) {
+                user1Data.daily = {
+                    points: 0,
+                    messages: 0,
+                    xp: 0
+                }
+            }
+            if ((Date.now() * 1000) - (user1Data.lastMSG) > 604800000000000) {
+                user1Data.weekly = {
+                    points: 0,
+                    messages: 0,
+                    xp: 0
+                }
+            }
+            if ((Date.now() * 1000) - (user1Data.lastMSG) > 2592000000000) {
+                user1Data.monthly = {
+                    points: 0,
+                    messages: 0,
+                    xp: 0
+                }
+            }
         }
-    } catch (err) {
-        user2Data.daily = {
-            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].points),
-            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].messages),
-            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].xp)
-        }
-    }
-    try {
-        user2Data.weekly = {
-            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 8]].points),
-            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 8]].messages),
-            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 8]].xp)
-        }
-    } catch (err) {
-        user2Data.weekly = {
-            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].points),
-            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].messages),
-            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].xp)
-        }
-    }
-    try {
-        user2Data.monthly = {
-            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 31]].points),
-            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 31]].messages),
-            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 31]].xp)
-        }
-    } catch (err) {
-        user2Data.monthly = {
-            points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].points),
-            messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].messages),
-            xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].xp)
-        }
-    }
-    if (user2Data.lastMSG) {
-        if ((Date.now() * 1000) - (user2Data.lastMSG) > 86400000000) {
+        let dailyKeys2 = Object.keys(user2Data.dailyStats);
+        try {
             user2Data.daily = {
-                points: 0,
-                messages: 0,
-                xp: 0
+                points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 2]].points),
+                messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 2]].messages),
+                xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 2]].xp)
+            }
+        } catch (err) {
+            user2Data.daily = {
+                points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].points),
+                messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].messages),
+                xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].xp)
             }
         }
-        if ((Date.now() * 1000) - (user2Data.lastMSG) > 604800000000000) {
+        try {
             user2Data.weekly = {
-                points: 0,
-                messages: 0,
-                xp: 0
+                points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 8]].points),
+                messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 8]].messages),
+                xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 8]].xp)
+            }
+        } catch (err) {
+            user2Data.weekly = {
+                points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].points),
+                messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].messages),
+                xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].xp)
             }
         }
-        if ((Date.now() * 1000) - (user2Data.lastMSG) > 2592000000000) {
+        try {
             user2Data.monthly = {
-                points: 0,
-                messages: 0,
-                xp: 0
+                points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 31]].points),
+                messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 31]].messages),
+                xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 31]].xp)
+            }
+        } catch (err) {
+            user2Data.monthly = {
+                points: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].points) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].points),
+                messages: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].messages) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].messages),
+                xp: parseFloat(user2Data.dailyStats[dailyKeys2[dailyKeys2.length - 1]].xp) - parseFloat(user2Data.dailyStats[dailyKeys2[0]].xp)
             }
         }
-    }
-    if (!user1Data || !user2Data) {
+        if (user2Data.lastMSG) {
+            if ((Date.now() * 1000) - (user2Data.lastMSG) > 86400000000) {
+                user2Data.daily = {
+                    points: 0,
+                    messages: 0,
+                    xp: 0
+                }
+            }
+            if ((Date.now() * 1000) - (user2Data.lastMSG) > 604800000000000) {
+                user2Data.weekly = {
+                    points: 0,
+                    messages: 0,
+                    xp: 0
+                }
+            }
+            if ((Date.now() * 1000) - (user2Data.lastMSG) > 2592000000000) {
+                user2Data.monthly = {
+                    points: 0,
+                    messages: 0,
+                    xp: 0
+                }
+            }
+        }
+        if (!user1Data || !user2Data) {
+            res.status(400).send({
+                error: 'User not found',
+                success: false
+            });
+            return;
+        }
+        res.render(__dirname + '/web/compare.ejs', {
+            user1: user1Data,
+            user2: user2Data
+        });
+    } catch (err) {
+        console.log(err);
         res.status(400).send({
-            error: 'User not found',
+            error: 'Something went wrong',
             success: false
         });
-        return;
     }
-    res.render(__dirname + '/web/compare.ejs', {
-        user1: user1Data,
-        user2: user2Data
-    });
 });
 
 app.get('/public/currency/user', async (req, res) => {
@@ -1666,6 +1676,7 @@ app.get('/public/currency/user', async (req, res) => {
             let users = currency
             let user = users.find(x => x.id == req.query.id);
             if (!user.dailyStats) {
+                console.log('no daily stats')
                 user.dailyStats = {};
                 user.dailyStats[`${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`] = {
                     messages: user.messages,
@@ -1767,7 +1778,8 @@ app.post('/public/currency', async (req, res) => {
     logRoute(req, res)
     try {
         if (req.query.uid) {
-            let user = [...currency].find(x => x.id == req.query.uid);
+            let users = JSON.parse(JSON.stringify(currency));
+            let user = users.find(x => x.id == req.query.uid);
             if (user) {
                 delete user.dailyStats;
                 delete user.warns;
@@ -2055,16 +2067,18 @@ async function checkLiveChannels() {
 async function cachePublic() {
     try {
         let users = await db.getOne('users');
+        users = [...users]
+        users = JSON.parse(JSON.stringify(users));
         for (let i = 0; i < users.length; i++) {
             calculateDaily(users[i]);
             calculateWeekly(users[i]);
             calculateMonthly(users[i]);
             resetIfInactive(users[i]);
-            delete users[i].dailyStats;
             delete users[i].hourlyStats;
             delete users[i].warns;
             delete users[i].allWarns;
             delete users[i].cooldown;
+            //delete users[i].dailyStats;
         }
         currency = users;
         fs.writeFileSync('./user/publicCurrencyCache.json', JSON.stringify(users));
