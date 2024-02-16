@@ -125,6 +125,14 @@ const addToWithinObject = async (type, key, value, key2, value2) => {
   } catch (error) { }
 };
 
+const findOne = async (type, key, value) => {
+  try {
+    let json = db[type];
+    let found = json.find((item) => item[key] === value);
+    return found;
+  } catch (error) { }
+}
+
 setInterval(() => {
   fs.writeFileSync('./user/db/commands.json', JSON.stringify(db.commands), 'utf8');
   fs.writeFileSync('./user/db/connection.json', JSON.stringify(db.connection), 'utf8');
@@ -154,5 +162,6 @@ export default {
   editWithinArray,
   overwriteObjectInArray,
   overWriteAll,
-  addToWithinObject
+  addToWithinObject,
+  findOne
 };

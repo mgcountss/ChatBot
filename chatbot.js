@@ -339,9 +339,8 @@ async function logMessage(chat) {
             let messages = await db.getOne('messages');
             let giveaway = await db.getOne('giveaway');
             let counting = await db.getOne('counting');
-            let found = false;
+            let found = await db.findOne('users', 'id', chat.authorChannelId);
             let respond = true;
-
             if (!found) {
                 let obj = {
                     id: chat.authorChannelId,
@@ -374,7 +373,9 @@ async function logMessage(chat) {
                     warnings: []
                 };
                 await db.addTo('users', obj);
-                sendMSG(`Welcome @${obj.name} to the stream!`);
+                if (chat.authorChannelId !== bot) {
+                    sendMSG(`Welcome @${obj.name} to the stream!`);
+                }
             }
             if (chat.membership) {
                 chat.member = chat.membership.status;
@@ -1259,12 +1260,12 @@ async function sendMSG(message) {
                 }
                 messages.push(message);
                 for (let i = 0; i < messages.length; i++) {
-                    mc.sendMessage(messages[i]).catch((error) => { })
+                    //mc.sendMessage(messages[i]).catch((error) => { })
                 }
                 return;
             } else {
                 message = message.toString()
-                mc.sendMessage(message).catch((error) => { })
+                //mc.sendMessage(message).catch((error) => { })
                 return;
             }
         } else {
@@ -1274,6 +1275,26 @@ async function sendMSG(message) {
         return "";
     }
 }
+
+async function removeDuplicates() {
+    let newArray = {};
+    let users = await db.getOne('users');
+    for (let i = 0; i < users.length; i++) {
+        if (!newArray[users[i].id]) {
+            newArray[users[i].id] = users[i];
+        } else {
+            if (newArray[users[i].id].points < users[i].points) {
+                newArray[users[i].id] = users[i];
+            }
+        }
+    }
+    let array = [];
+    for (let i in newArray) {
+        array.push(newArray[i]);
+    }
+    await db.overwriteOne('users', array);
+}
+removeDuplicates()
 
 export default {
     action,
