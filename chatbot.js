@@ -486,6 +486,9 @@ async function logMessage(chat) {
                             }
                         }
                         if (stringify(chat.message).startsWith('!')) {
+                            if (stringify(chat.message).startsWith('!place ')) {
+                                return "";
+                            }
                             chat.message = stringify(chat.message);
                             chat.message = chat.message.replace('!', '!vote ');
                             const userIndex = users.findIndex(x => x.id === chat.authorChannelId);
