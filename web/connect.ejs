@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>ChatBot</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 5vw;
+            background-color: #141414;
+            margin: 0;
+            color: #FFF;
+        }
+
+        h1 {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+        h6 {
+            font-size: 2vw;
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+        p {
+            font-size: 1vw;
+            margin-bottom: 10;
+        }
+
+        button {
+            margin-top: 10;
+            font-size: 4vw;
+            background-color: #141414;
+            border: 0.5vw solid #FFF;
+            color: #FFF;
+            padding: 1vw;
+            border-radius: 0.5vw;
+            cursor: pointer;
+            transition: all 0.5s ease-in-out;
+        }
+
+        button:hover {
+            background-color: #FFF;
+            color: #141414;
+            scale: 1.1;
+        }
+
+        ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #141414;
+            color: #FFF;
+        }
+
+        li {
+            text-align: center;
+            font-size: 1vw;
+        }
+
+        p {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+        input {
+            margin-top: 0;
+            margin-bottom: 0;
+            font-size: 0.5em;
+        }
+
+        label {
+            margin-top: 0px;
+            font-size: 0.3em;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>MGBot</h1>
+    <h6>The Next YouTube Chatbot</h6>
+    <hr>
+    <p>Welcome to MGBot, the next great (maybe) YouTube live stream chatbot!</p>
+    <p>Currently, MGBot is in development, and is not yet ready for use.</p>
+    <hr style="margin-bottom: 0px;">
+        <label>Fill in all fields</label><br>
+        <input id="channelID" type="text" placeholder="Channel ID (of streamer)" required>
+        <input id="botID" type="text" placeholder="Channel ID (of bot)" required><br>
+        <button type="button" onclick="start()">Start</button>
+    <hr>
+    <h6>Current List of Features</h6>
+    <ul>
+        <li>Send Messages</li>
+        <li>Receive Messages</li>
+        <li>Custom Commands</li>
+        <li>Channel Point System</li>
+        <li>Auto Detect Live</li>
+        <li>Auto Detect Offline</li>
+        <li>Dashboard</li>
+        <li>Chat Logs</li>
+        <li>Timers</li>
+        <li>Giveaways</li>
+        <li>User Stats</li>
+        <li>Timers</li>
+        <li>Chat Moderation</li>
+    </ul>
+    <hr>
+    <script>
+        function start() {
+            fetch('/connect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    channelID: document.getElementById('channelID').value,
+                    botID: document.getElementById('botID').value
+                })
+            }).then(res => res.json()).then(data => {
+                if (data.success) {
+                    window.location.href = '/dashboard'
+                } else {
+                    alert('Error: ' + data.error)
+                }
+            }).catch(err => {
+                alert('Error: ' + err)
+            })
+        }
+    </script>
+</body>
+
+</html>

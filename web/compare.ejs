@@ -1,0 +1,1121 @@
+<html>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<link rel="stylesheet" href="/file/odometer.css">
+<script src="/file/odometer.js"></script>
+<link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;1,400&amp;display=swap">
+<script src="https://code.highcharts.com/10.3.3/highcharts.js"></script>
+<script src="https://code.highcharts.com/10.3.3/modules/exporting.js"></script>
+<script src="https://code.highcharts.com/10.3.3/modules/offline-exporting.js"></script>
+<script src="https://code.highcharts.com/10.3.3/modules/export-data.js"></script>
+<style>
+    .highcharts-title {
+        color: #FFFFFF
+    }
+
+    .body {
+        text-align: center;
+        font-family: 'Open Sans', sans-serif;
+        background-color: #141414;
+        color: #FFF;
+        font-size: 2vw;
+        margin-top: 0px;
+    }
+</style>
+
+<body class="body">
+    <center>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr);">
+            <div>
+                <br>
+                <img id="img1" style="border-radius: 50%; width: 10vw; height: 10vw;" src="<%=user1.photo%>">
+                <h1 id="namer1" style="margin-top: 0.5vw;">
+                    <%=user1.name%>
+                </h1>
+                <h1 id="odometer1" style="font-size: 4em; margin-top: -1vw;" class="odometer">
+                    <%=user1.points%>
+                </h1>
+            </div>
+            <div>
+                <br>
+                <img id="img2" style="border-radius: 50%; width: 10vw; height: 10vw;" src="<%=user2.photo%>">
+                <h1 id="namer2" style="margin-top: 0.5vw;">
+                    <%=user2.name%>
+                </h1>
+                <h1 id="odometer2" style="font-size: 4em; margin-top: -1vw;" class="odometer">
+                    <%=user2.points%>
+                </h1>
+            </div>
+        </div>
+        <div>
+            <h3>Difference</h3>
+            <h1 id="difference" style="font-size: 4em; margin-top: -1vw;" class="odometer">
+                <%=user1.points - user2.points%>
+            </h1>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr);">
+            <div>
+                <hr style="background-color: #FFF;">
+                <h6>Points/Messages Since Page Opened</h6>
+                <div id="chart1" style="height: 30vw; width: 100%; color: #000000;"></div>
+                <hr style="background-color: #FFF;">
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr);">
+                    <div style="text-align: center;">
+                        <h6>Messages</h6>
+                        <h1 id="messages1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.messages%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Hours</h6>
+                        <h1 id="hours1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.hours%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>XP</h6>
+                        <h1 id="xp1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.xp%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Last MSG</h6>
+                        <h1 id="last1" style="font-size: 0.5em; margin-top: -2vw;">Calculating...</h1>
+                    </div>
+                </div>
+                <hr>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr);">
+                    <div style="text-align: center;">
+                        <h6>Daily Points</h6>
+                        <h1 id="dailyPoints1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.daily.points%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Weekly Points</h6>
+                        <h1 id="weeklyPoints1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.weekly.points%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Monthly Points</h6>
+                        <h1 id="monthlyPoints1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.monthly.points%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Daily Messages</h6>
+                        <h1 id="dailyMessages1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.daily.messages%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Weekly Messages</h6>
+                        <h1 id="weeklyMessages1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.weekly.messages%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Monthly Messages</h6>
+                        <h1 id="monthlyMessages1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.monthly.messages%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Daily XP</h6>
+                        <h1 id="dailyXP1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.daily.xp%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Weekly XP</h6>
+                        <h1 id="weeklyXP1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.weekly.xp%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Monthly XP</h6>
+                        <h1 id="monthlyXP1" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user1.monthly.xp%>
+                        </h1>
+                    </div>
+                </div>
+                <hr>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr);">
+                    <div style="border: solid 1px #FFF;">
+                        <h6>Points</h6>
+                        <div id="user1_chart1" style="height: 20vw; width: 100%; color: #000000;"></div>
+                    </div>
+                    <div style="border: solid 1px #FFF;">
+                        <h6>Messages</h6>
+                        <div id="user1_chart2" style="height: 20vw; width: 100%; color: #000000;"></div>
+                    </div>
+                    <div style="border: solid 1px #FFF;">
+                        <h6>Hours</h6>
+                        <div id="user1_chart3" style="height: 20vw; width: 100%; color: #000000;"></div>
+                    </div>
+                    <div style="border: solid 1px #FFF;">
+                        <h6>XP</h6>
+                        <div id="user1_chart4" style="height: 20vw; width: 100%; color: #000000;"></div>
+                    </div>
+                </div>
+                <br>
+                <div class="table-responsive" style="border: solid 1px #FFF;">
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th style="border: solid 1px #FFF;">Date</th>
+                                <th style="border: solid 1px #FFF;">Total Points</th>
+                                <th style="border: solid 1px #FFF;">Point Gain</th>
+                                <th style="border: solid 1px #FFF;">Total Messages</th>
+                                <th style="border: solid 1px #FFF;">Message Gain</th>
+                                <th style="border: solid 1px #FFF;">Total Hours</th>
+                                <th style="border: solid 1px #FFF;">Hour Gain</th>
+                                <th style="border: solid 1px #FFF;">Total XP</th>
+                                <th style="border: solid 1px #FFF;">XP Gain</th>
+                            </tr>
+                        </thead>
+                        <tbody style="border-style: none;" class="counters">
+                            <%let last1=user1.dailyStats[Object.keys(user1.dailyStats)[0]]%>
+                                <% Object.keys(user1.dailyStats).forEach((stat)=> { %>
+                                    <tr>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=stat%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user1.dailyStats[stat].points%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user1.dailyStats[stat].points - last1.points%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user1.dailyStats[stat].messages%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user1.dailyStats[stat].messages - last1.messages%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=(user1.dailyStats[stat].points / 12).toFixed(2)%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=parseFloat((user1.dailyStats[stat].points / 12) - (last1.points /
+                                                12)).toFixed(2)%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user1.dailyStats[stat].xp%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user1.dailyStats[stat].xp - last1.xp%>
+                                        </td>
+                                    </tr>
+                                    <% last1=user1.dailyStats[stat] %>
+                                        <%})%>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div>
+                <hr style="background-color: #FFF;">
+                <h6>Points/Messages Since Page Opened</h6>
+                <div id="chart2" style="height: 30vw; width: 100%; color: #000000;"></div>
+                <hr style="background-color: #FFF;">
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr);">
+                    <div style="text-align: center;">
+                        <h6>Messages</h6>
+                        <h1 id="messages2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.messages%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Hours</h6>
+                        <h1 id="hours2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.hours%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>XP</h6>
+                        <h1 id="xp2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.xp%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Last MSG</h6>
+                        <h1 id="last2" style="font-size: 0.5em; margin-top: -2vw;">Calculating...</h1>
+                    </div>
+                </div>
+                <hr>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr);">
+                    <div style="text-align: center;">
+                        <h6>Daily Points</h6>
+                        <h1 id="dailyPoints2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.daily.points%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Weekly Points</h6>
+                        <h1 id="weeklyPoints2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.weekly.points%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Monthly Points</h6>
+                        <h1 id="monthlyPoints2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.monthly.points%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Daily Messages</h6>
+                        <h1 id="dailyMessages2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.daily.messages%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Weekly Messages</h6>
+                        <h1 id="weeklyMessages2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.weekly.messages%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Monthly Messages</h6>
+                        <h1 id="monthlyMessages2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.monthly.messages%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Daily XP</h6>
+                        <h1 id="dailyXP2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.daily.xp%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Weekly XP</h6>
+                        <h1 id="weeklyXP2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.weekly.xp%>
+                        </h1>
+                    </div>
+                    <div style="text-align: center;">
+                        <h6>Monthly XP</h6>
+                        <h1 id="monthlyXP2" style="font-size: 1em; margin-top: -2vw;" class="odometer">
+                            <%=user2.monthly.xp%>
+                        </h1>
+                    </div>
+                </div>
+                <hr>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr);">
+                    <div style="border: solid 1px #FFF;">
+                        <h6>Points</h6>
+                        <div id="user2_chart1" style="height: 20vw; width: 100%; color: #000000;"></div>
+                    </div>
+                    <div style="border: solid 1px #FFF;">
+                        <h6>Messages</h6>
+                        <div id="user2_chart2" style="height: 20vw; width: 100%; color: #000000;"></div>
+                    </div>
+                    <div style="border: solid 1px #FFF;">
+                        <h6>Hours</h6>
+                        <div id="user2_chart3" style="height: 20vw; width: 100%; color: #000000;"></div>
+                    </div>
+                    <div style="border: solid 1px #FFF;">
+                        <h6>XP</h6>
+                        <div id="user2_chart4" style="height: 20vw; width: 100%; color: #000000;"></div>
+                    </div>
+                </div>
+                <br>
+                <div class="table-responsive" style="border: solid 1px #FFF;">
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th style="border: solid 1px #FFF;">Date</th>
+                                <th style="border: solid 1px #FFF;">Total Points</th>
+                                <th style="border: solid 1px #FFF;">Point Gain</th>
+                                <th style="border: solid 1px #FFF;">Total Messages</th>
+                                <th style="border: solid 1px #FFF;">Message Gain</th>
+                                <th style="border: solid 1px #FFF;">Total Hours</th>
+                                <th style="border: solid 1px #FFF;">Hour Gain</th>
+                                <th style="border: solid 1px #FFF;">Total XP</th>
+                                <th style="border: solid 1px #FFF;">XP Gain</th>
+                            </tr>
+                        </thead>
+                        <tbody style="border-style: none;" class="counters">
+                            <%let last2=user2.dailyStats[Object.keys(user2.dailyStats)[0]]%>
+                                <% Object.keys(user2.dailyStats).forEach((stat)=> { %>
+                                    <tr>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=stat%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user2.dailyStats[stat].points%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user2.dailyStats[stat].points - last2.points%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user2.dailyStats[stat].messages%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user2.dailyStats[stat].messages - last2.messages%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=(user2.dailyStats[stat].points / 12).toFixed(2)%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=parseFloat((user2.dailyStats[stat].points / 12) - (last2.points /
+                                                12)).toFixed(2)%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user2.dailyStats[stat].xp%>
+                                        </td>
+                                        <td style="border: solid 1px #FFF;">
+                                            <%=user2.dailyStats[stat].xp - last2.xp%>
+                                        </td>
+                                    </tr>
+                                    <% last2=user2.dailyStats[stat] %>
+                                        <%})%>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div style="border: solid 1px #FFF;">
+            <h6>Points Compared</h6>
+            <div id="points_compared" style="height: 20vw; width: 100%; color: #000000;"></div>
+        </div>
+        <div style="border: solid 1px #FFF;">
+            <h6>Messages Compared</h6>
+            <div id="messages_compared" style="height: 20vw; width: 100%; color: #000000;"></div>
+        </div>
+        <div style="border: solid 1px #FFF;">
+            <h6>XP Compared</h6>
+            <div id="xp_compared" style="height: 20vw; width: 100%; color: #000000;"></div>
+        </div>
+    </center>
+</body>
+<script>
+    var params = new URLSearchParams(document.location.search.substring(1));
+    var id1 = params.get("id1");
+    var id2 = params.get("id2");
+    let dailyStats1 = "<%=JSON.stringify(user1.dailyStats)%>"
+    let dailyStats2 = "<%=JSON.stringify(user2.dailyStats)%>"
+    let user1_chartData1 = []
+    let user1_chartData2 = []
+    let user1_chartData3 = []
+    let user1_chartData4 = []
+    let user2_chartData1 = []
+    let user2_chartData2 = []
+    let user2_chartData3 = []
+    let user2_chartData4 = []
+    let points_compared = []
+    let messages_compared = []
+    let xp_compared = []
+    function subs() {
+        fetch("/public/currency/?uid=" + id1, {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }).then((res) => res.json()).then((data1) => {
+            data1 = data1.user
+            document.getElementById('odometer1').innerHTML = Math.floor(data1.points)
+            document.getElementById('messages1').innerHTML = data1.messages
+            document.getElementById('xp1').innerHTML = data1.xp
+            document.getElementById('hours1').innerHTML = parseFloat(data1.hours).toFixed(2)
+            document.getElementById('last1').innerHTML = new Date(data1.lastMSG)
+            chart1.series[0].addPoint([Date.now(), Math.floor(data1.points)])
+            chart1.series[1].addPoint([Date.now(), Math.floor(data1.messages)])
+            fetch("/public/currency/?uid=" + id2, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then((res) => res.json()).then((data2) => {
+                data2 = data2.user
+                document.getElementById('odometer2').innerHTML = Math.floor(data2.points)
+                document.getElementById('messages2').innerHTML = data2.messages
+                document.getElementById('xp2').innerHTML = data2.xp
+                document.getElementById('hours2').innerHTML = parseFloat(data2.hours).toFixed(2)
+                document.getElementById('last2').innerHTML = new Date(data2.lastMSG)
+                chart2.series[0].addPoint([Date.now(), Math.floor(data2.points)])
+                chart2.series[1].addPoint([Date.now(), Math.floor(data2.messages)])
+                document.getElementById('difference').innerHTML = Math.floor(data1.points - data2.points)
+            })
+        })
+    }
+    dailyStats1 = dailyStats1.replace(/&quot;/g, '"')
+    dailyStats1 = dailyStats1.replace(/&#34;/g, '"')
+    dailyStats1 = JSON.parse(dailyStats1)
+    dailyStats1 = Object.keys(dailyStats1).map((key) => {
+        return {
+            date: key,
+            messages: parseFloat(dailyStats1[key].messages),
+            points: parseFloat(dailyStats1[key].points),
+            hours: parseFloat((dailyStats1[key].points / 12).toFixed(2)),
+            xp: parseFloat(dailyStats1[key].xp)
+        }
+    })
+
+    dailyStats1.forEach((stat) => {
+        user1_chartData1.push([new Date(stat.date).getTime(), stat.points])
+        user1_chartData2.push([new Date(stat.date).getTime(), stat.messages])
+        user1_chartData3.push([new Date(stat.date).getTime(), stat.hours])
+        user1_chartData4.push([new Date(stat.date).getTime(), stat.xp])
+    })
+
+    dailyStats2 = dailyStats2.replace(/&quot;/g, '"')
+    dailyStats2 = dailyStats2.replace(/&#34;/g, '"')
+    dailyStats2 = JSON.parse(dailyStats2)
+    dailyStats2 = Object.keys(dailyStats2).map((key) => {
+        return {
+            date: key,
+            messages: parseFloat(dailyStats2[key].messages),
+            points: parseFloat(dailyStats2[key].points),
+            hours: parseFloat((dailyStats2[key].points / 12).toFixed(2)),
+            xp: parseFloat(dailyStats2[key].xp)
+        }
+    })
+
+    dailyStats2.forEach((stat) => {
+        user2_chartData1.push([new Date(stat.date).getTime(), stat.points])
+        user2_chartData2.push([new Date(stat.date).getTime(), stat.messages])
+        user2_chartData3.push([new Date(stat.date).getTime(), stat.hours])
+        user2_chartData4.push([new Date(stat.date).getTime(), stat.xp])
+    })
+
+    let user1_chart1 = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'user1_chart1',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false,
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: 'Points',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user1_chartData1
+        }]
+    });
+
+    let user1_chart2 = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'user1_chart2',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: 'Messages',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user1_chartData2
+        }]
+    });
+
+    let user1_chart3 = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'user1_chart3',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: 'Hours',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user1_chartData3
+        }]
+    });
+
+    let user1_chart4 = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'user1_chart4',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: 'XP',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user1_chartData4
+        }]
+    });
+
+    let chart1 = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'chart1',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: 'Points',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2
+        }, {
+            showInLegend: true,
+            name: 'Messages',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2
+        }]
+    });
+
+    let user2_chart1 = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'user2_chart1',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false,
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: 'Points',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user2_chartData1
+        }]
+    });
+
+    let user2_chart2 = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'user2_chart2',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: 'Messages',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user2_chartData2
+        }]
+    });
+
+    let user2_chart3 = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'user2_chart3',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: 'Hours',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user2_chartData3
+        }]
+    });
+
+    let user2_chart4 = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'user2_chart4',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: 'XP',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user2_chartData4
+        }]
+    });
+
+    let chart2 = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'chart2',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: 'Points',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2
+        }, {
+            showInLegend: true,
+            name: 'Messages',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2
+        }]
+    });
+
+    let points_compared_chart = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'points_compared',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: '<%=user1.name%> Points',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user1_chartData1
+        }, {
+            showInLegend: true,
+            name: '<%=user2.name%> Points',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user2_chartData1
+        }]
+    });
+
+    let messages_compared_chart = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'messages_compared',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: '<%=user1.name%> Messages',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user1_chartData2
+        }, {
+            showInLegend: true,
+            name: '<%=user2.name%> Messages',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user2_chartData2
+        }]
+    });
+
+    let xp_compared_chart = new Highcharts.chart({
+        navigation: {
+            buttonOptions: {
+                align: 'left'
+            }
+        },
+        chart: {
+            renderTo: 'xp_compared',
+            type: 'spline',
+            zoomType: 'x',
+            backgroundColor: 'transparent',
+            plotBorderColor: 'transparent'
+        },
+        title: {
+            text: ' '
+        },
+        credits: {
+            enabled: false,
+        },
+        xAxis: {
+            type: 'datetime',
+            visible: false
+        },
+        yAxis: {
+            visible: false,
+        },
+        plotOptions: {
+            series: {
+                threshold: null,
+                fillOpacity: 0.25
+            },
+            area: {
+                fillOpacity: 0.25
+            }
+        },
+        series: [{
+            showInLegend: true,
+            name: '<%=user1.name%> XP',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user1_chartData4
+        }, {
+            showInLegend: true,
+            name: '<%=user2.name%> XP',
+            marker: { enabled: false },
+            color: '#FFF',
+            lineColor: '#FFF',
+            lineWidth: 2,
+            data: user2_chartData4
+        }]
+    });
+
+    subs()
+    setInterval(subs, 10000)
+</script>
+
+
+</html>

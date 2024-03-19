@@ -1,0 +1,217 @@
+<html>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootswatch/4.5.2/darkly/bootstrap.min.css">
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+<script src="/file/odometer.js"></script>
+<link rel="stylesheet" href="/file/odometer.css" />
+<style>
+    .name {
+        margin-left: 20px;
+    }
+
+    tr:hover {
+        cursor: pointer;
+    }
+
+    #go {
+        height: 100px;
+        width: 400px;
+        font-size: 40px;
+    }
+
+    #autocomplete,
+    #autocomplete2 {
+        height: 50px;
+        width: 1000px;
+        border-radius: 10px;
+        background-color: #494949
+    }
+
+    #autocomplete::placeholder,
+    #autocomplete2::placeholder {
+        color: #FFFFFF
+    }
+
+    .ui-menu-item-wrapper {
+        background-color: #494949;
+    }
+</style>
+<center>
+    <a href="/public/compare/search" style="font-size: 4vw;">Compare [RELEASED FINALLY]</a><br>
+    <hr style="background-color: #FFF;">
+    <h1 style="font-size: 2vw;">Total Users</h1>
+    <h1 style="font-size: 4vw;" class="odometer" id="total">0</h1>
+    <hr style="background-color: #FFF;">
+    <label for="autocomplete" style="color: #FFFFFF; font-size: 50px;" id="margin">Search</label>
+    <br>
+    <input id="autocomplete" style="color: #FFFFFF;" placeholder="Search Term" autocomplete="off">
+    <button onclick="load()">Search</button>
+    <hr style="background-color: #FFF;">
+</center>
+<div class="table-responsive" style="border-style: none;">
+    <table class="table table-striped table-dark table-sm">
+        <thead>
+            <tr>
+                <th style="border-style: solid;border-right-style: solid;" onclick="sortData('name')">Name</th>
+                <th style="border-style: solid;" onclick="sortData('points')">Points</th>
+                <th style="border-style: solid;" onclick="sortData('messages')">Messages</th>
+                <th style="border-style: solid;" onclick="sortData('hours')">Hours</th>
+                <th style="border-style: solid;" onclick="sortData('xp')">XP</th>
+                <th style="border-style: solid;" onclick="sortData('dailyPoints')">Daily Points</th>
+                <th style="border-style: solid;" onclick="sortData('dailyMessages')">Daily Messages</th>
+                <th style="border-style: solid;" onclick="sortData('dailyXP')">Daily XP</th>
+                <th style="border-style: solid;" onclick="sortData('weeklyPoints')">Weekly Points</th>
+                <th style="border-style: solid;" onclick="sortData('weeklyMessages')">Weekly Messages</th>
+                <th style="border-style: solid;" onclick="sortData('weeklyXP')">Weekly XP</th>
+                <th style="border-style: solid;" onclick="sortData('monthlyPoints')">Monthly Points</th>
+                <th style="border-style: solid;" onclick="sortData('monthlyMessages')">Monthly Messages</th>
+                <th style="border-style: solid;" onclick="sortData('monthlyXP')">Monthly XP</th>
+                <th style="border-style: solid;" onclick="sortData('lastMSG')">Last Message</th>
+            </tr>
+        </thead>
+        <tbody style="border-style: none;" class="counters"></tbody>
+    </table>
+    <center>
+        <button onclick="offset += 15; load()">Load More</button>
+    </center>
+</div>
+<script>
+    var pastData = []
+    var sort = 'points'
+    let order = 'desc'
+    let offset = 0
+    let limit = 15
+    let lastSearch = ""
+
+    function load() {
+        let search = "";
+        if ($('#autocomplete').val() != "") {
+            search = "&search=" + $('#autocomplete').val()
+        }
+        if (lastSearch != search) {
+            offset = 0
+            lastSearch = search
+            $('.counters').html('')
+        }
+        fetch("/public/currency/?offset=" + offset + "&limit=" + limit + "&sort=" + sort + "&order=" + order + "" + search, {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+        }).then(res => res.json()).then(data => {
+            if (!data.success) {
+                alert('Error loading data')
+                return
+            }
+            total.innerHTML = data.total
+            data = data.users
+            pastData = data
+            for (var q = 0; q < data.length; q++) {
+                let place = q + 1 + offset
+                var htmlcard = `<tr onclick="ee(this)" id="tr_${q}" cid="${data[q].id}">
+                    <td style="border-right-style: solid;border-left-style: solid;" cid="${data[q].id}">
+                        <img style="width: 40px;height: 40px;" id="img_${q}" src="${data[q].photo}" cid="${data[q].id}">
+                        <strong id="name_${q}" class="name" cid="${data[q].id}">${data[q].name.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</strong>
+                        <td id="points_${q}" cid="${data[q].id}">${Math.floor(parseFloat(data[q].points)).toLocaleString()}</td>
+                        <td id="messages_${q}" cid="${data[q].id}">${parseFloat(data[q].messages).toLocaleString()}</td>
+                        <td id="hours_${q}" cid="${data[q].id}">${parseFloat(data[q].hours).toFixed(2).toLocaleString()}</td>
+                        <td id="xp_${q}" cid="${data[q].id}">${parseFloat(data[q].xp).toLocaleString()}</td>
+                        <td id="dailyPoints_${q}" cid="${data[q].id}">${data[q].daily.points.toLocaleString()}</td>
+                        <td id="dailyMessages_${q}" cid="${data[q].id}">${data[q].daily.messages.toLocaleString()}</td>
+                        <td id="dailyXP_${q}" cid="${data[q].id}">${data[q].daily.xp ? data[q].daily.xp.toLocaleString() : 0}</td>
+                        <td id="weeklyPoints_${q}" cid="${data[q].id}">${data[q].weekly.points.toLocaleString()}</td>
+                        <td id="weeklyMessages_${q}" cid="${data[q].id}">${data[q].weekly.messages.toLocaleString()}</td>
+                        <td id="weeklyXP_${q}" cid="${data[q].id}">${data[q].weekly.xp ? data[q].weekly.xp.toLocaleString() : 0}</td>
+                        <td id="monthlyPoints_${q}" cid="${data[q].id}">${data[q].monthly.points.toLocaleString()}</td>
+                        <td id="monthlyMessages_${q}" cid="${data[q].id}">${data[q].monthly.messages.toLocaleString()}</td>
+                        <td id="monthlyXP_${q}" cid="${data[q].id}">${data[q].monthly.xp ? data[q].monthly.xp.toLocaleString() : 0}</td>
+                        <td id="lastMSG_${q}" cid="${data[q].id}">${relativeTime(data[q].lastMSG)}</td>
+                    </tr>`;
+                $('.counters').append(htmlcard)
+            }
+        })
+    }
+
+    function ee(elmnt) {
+        window.location.href = "/public/currency/user?id=" + elmnt.getAttribute('cid')
+    }
+
+    function sortData(by) {
+        if (sort == by) {
+            order = order == 'desc' ? 'asc' : 'desc'
+        } else {
+            order = 'desc'
+        }
+        sort = by
+        pastData = []
+        offset = 0
+        $('.counters').html('')
+        load()
+    }
+
+    var disqus_config = function () {
+        this.page.url = "https://chatbot.mgcounts.com/public/currency";  // Replace PAGE_URL with your page's canonical URL variable
+        this.page.identifier = "https://chatbot.mgcounts.com/public/currency"; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+    };
+
+    (function () { // DON'T EDIT BELOW THIS LINE
+        var d = document, s = d.createElement('script');
+        s.src = 'https://mgcounts.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+
+    function relativeTime(previous) {
+        if (previous === 0) {
+            return "never"
+        }
+        previous = parseInt(previous) / 1000;
+        const date = new Date();
+        const timestamp = date.getTime();
+        previous = Math.floor(previous / 1000)
+        const difference = Math.floor(timestamp / 1000) - previous;
+        let output = ``;
+        if (difference < 60) {
+            if (difference === 1) {
+                output = `${difference} second ago`;
+            } else {
+                output = `${difference} seconds ago`;
+            }
+        } else if (difference < 3600) {
+            if (difference === 1) {
+                output = `${Math.floor(difference / 60)} minute ago`;
+            } else {
+                output = `${Math.floor(difference / 60)} minutes ago`;
+            }
+        } else if (difference < 86400) {
+            if (difference === 1) {
+                output = `${Math.floor(difference / 3600)} hour ago`;
+            } else {
+                output = `${Math.floor(difference / 3600)} hours ago`;
+            }
+        } else if (difference < 2620800) {
+            if (difference === 1) {
+                output = `${Math.floor(difference / 86400)} day ago`;
+            } else {
+                output = `${Math.floor(difference / 86400)} days ago`;
+            }
+        } else if (difference < 31449600) {
+            if (difference === 1) {
+                output = `${Math.floor(difference / 2620800)} month ago`;
+            } else {
+                output = `${Math.floor(difference / 2620800)} months ago`;
+            }
+        } else {
+            if (difference === 1) {
+                output = `${Math.floor(difference / 31449600)} year ago`;
+            } else {
+                output = `${Math.floor(difference / 31449600)} years ago`;
+            }
+        }
+        return output;
+    }
+    load()
+</script>
+<br>
+<div id="disqus_thread"></div>

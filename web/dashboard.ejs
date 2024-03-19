@@ -1,0 +1,1689 @@
+<% if ((!user.connection) || (!user.connection.channel)) {res.redirect('/connect')}%>
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>ChatBot</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #141414;
+            margin: 0;
+            color: #FFF;
+        }
+
+        .all {
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+        }
+
+        .tabs {
+            width: 20vw;
+            background-color: #141414;
+            color: #FFF;
+            border-right: 0.5vw solid #FFF;
+        }
+
+        .main {
+            width: 80vw;
+            background-color: #141414;
+            color: #FFF;
+        }
+
+        li:hover {
+            background-color: #FFF;
+            cursor: pointer;
+            border: 0.1vw solid #FFF;
+        }
+
+        .tab {
+            display: none;
+        }
+
+        .chat-item {
+            border: solid #FFF 1px;
+            text-align: left;
+        }
+
+        #chatBoard {
+            overflow: scroll;
+            height: 95vh;
+        }
+
+        .chatName {
+            font-weight: bolder;
+            color: #FFF;
+            margin-top: 0px;
+        }
+
+        .chatMessage {
+            font-weight: normal;
+            color: #FFF;
+            margin-top: -15px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 0.5vw;
+        }
+
+        tr:nth-child(even) {
+            background-color: #222;
+            padding: 0.5vw;
+        }
+
+        td {
+            border: 1px solid #FFF;
+            padding: 0.5vw;
+        }
+
+        .popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 75%;
+            background-color: rgba(255, 255, 255, 1);
+            z-index: 999;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: solid 0.3vw #000;
+            text-align: center;
+            overflow: scroll;
+        }
+
+        .popup-content {
+            padding: 0.5vw;
+            color: #000;
+        }
+
+        .popup-button {
+            font-size: 2vw;
+            margin-top: -1vw;
+        }
+
+        table {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        td {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="all">
+        <div class="tabs">
+            <h1>MGBot</h1>
+            <ul>
+                <li id="dashboard">Dashboard</li>
+                <li id="chat">Chat</li>
+                <li id="commands">Commands</li>
+                <li id="users">Users</li>
+                <li id="votes">Votes</li>
+                <li id="giveaway">Giveaway</li>
+                <li id="timers">Timers</li>
+                <li id="quotes">Quotes</li>
+                <li id="logs">Logs</li>
+                <li id="moderation">Moderation</li>
+                <li id="counting">Counting</li>
+            </ul>
+        </div>
+        <div class="main" id="main">
+            <div class="dashboard tab">
+                <div>
+                    </h2><br>
+                    <% if (auth) {%>
+                        <h5>(write this down somewhere) (DO NOT SHARE) CODE: <h1 code="<%=key%>" onclick="showCode()" id="code">click to show</h1></h5>
+                        <%}%>
+                    <button style="font-size: 2vw;" onclick="window.location.href = '/public/currency'">View Points Data</button><br>
+                    <hr>
+                    <img src="<%=user.connection.channel.snippet.thumbnails.medium.url%>" alt="Channel Thumbnail"
+                        style="height: 4vw;">
+                    <h3>You are connected to <%=user.connection.channel.snippet.title%>!</h3>
+                    <hr>
+                    <img src="<%=user.stream.thumbnail%>" alt="Stream Thumbnail" style="width: 10vw;"><br>
+                    <label><a href="https://www.youtube.com/watch?v=<%=user.stream.id%>">Watch
+                            Live</a></label><br><br>
+                    <label>Stream Title: <%=user.stream.title%></label><br>
+                    <label>Status: <%=user.stream.live%></label><br>
+                    <label>Viewers: <%=user.stream.viewers.toLocaleString()%></label><br>
+                    <label>Messages: <%=user.stream.messages.toLocaleString()%></label><br>
+                    <br>
+                    <label>Don't see your stream?</label><br>
+                    <button id="refresh" onclick="checkforstream()">Refresh Stream!</button>
+                    <hr>
+                    <button onclick="enableBot()">
+                        <%if (user.settings.chatbot.enabled==false) { %>Enable Bot<% } else { %>Disable Bot<% } %>
+                    </button>
+                    <button id="logout">Logout</button><br><br>
+                </div>
+            </div>
+            <div class="chat tab">
+                <div id="chatBoard"></div>
+            </div>
+            <div class="users tab">
+                <div style="display: flex;">
+                    <input type="text" id="search" placeholder="Search for a user...">
+                    <button onclick="searchTable()">Search</button>
+                    <select id="sortType">
+                        <option value="name">Username</option>
+                        <option value="points">Points</option>
+                        <option value="hours">Hours</option>
+                        <option value="xp">XP</option>
+                        <option value="messages">Messages</option>
+                        <option value="lastmsg">Last Message</option>
+                        <option value="moderator">Moderator</option>
+                        <option value="verified">Verified</option>
+                        <option value="owner">Owner</option>
+                        <option value="customRank">Custom Rank</option>
+                    </select>
+                    <button onclick="sortTable()">Sort</button>
+                    <label>Currency Status: </label><button id="currencyStatus" onclick="enableCurrency()">
+                        <%if (user.settings.currency.enabled) { %>Enabled<% } else { %>Disabled<% } %>
+                    </button>
+                </div>
+                <table id="points">
+                    <tr>
+                        <th>Image</th>
+                        <th>Username</th>
+                        <th>Points</th>
+                        <th>Hours</th>
+                        <th>XP</th>
+                        <th>Messages</th>
+                        <th>LastMSG</th>
+                        <th>Member</th>
+                        <th>Moderator</th>
+                        <th>Verified</th>
+                        <th>Owner</th>
+                        <th>Custom Rank</th>
+                        <th>Warns</th>
+                    </tr>
+                </table>
+                <button onclick="loadMorePoints()" id="loadMore">Load More</button>
+            </div>
+            <div class="votes tab">
+                <table id="vote">
+                    <tr>
+                        <th>Name</th>
+                        <th>Votes</th>
+                    </tr>
+                    </tr>
+                    <% let length2=user.votes.length; %>
+                        <% votes=user.votes.sort(function(a, b) { return b.votes - a.votes; }); %>
+                            <% if (user.votes.length>= 30) { %>
+                                <% length2=30; %>
+                                    <% } %>
+                                        <% for (var i=0; i < length2; i++) { %>
+                                            <tr userID="<%=user.votes[i].id%>">
+                                                <td>
+                                                    <%=user.votes[i].name%>
+                                                </td>
+                                                <td>
+                                                    <%=Math.floor(user.votes[i].votes).toLocaleString()%>
+                                                </td>
+                                            </tr>
+                                            <%}%>
+                </table>
+                <button onclick="loadMoreVotes()">Load More</button>
+            </div>
+            <div class="commands tab">
+                <button onclick="addCommand()" style="border: solid 0.3vw #FFF; font-size: 2vw;">
+                    Add Command
+                </button>
+                <table id="t">
+                    <tr>
+                        <th>Command</th>
+                        <th>Response</th>
+                        <th>Cooldown</th>
+                        <th>Rank</th>
+                        <th>Default</th>
+                        <th>Uses</th>
+                        <th>Save</th>
+                        <th>Remove</th>
+                    </tr>
+                    <% user.commands=user.commands.sort(function(a, b) { return a.command.localeCompare(b.command); });
+                        %>
+                        <% for (var i=0; i < user.commands.length; i++) { %>
+                            <tr>
+                                <td>
+                                    <input id="command_<%=user.commands[i].id%>" autocomplete="off" type="text"
+                                        class="command" value="<%=user.commands[i].command%>">
+                                </td>
+                                <td>
+                                    <textarea id="response_<%=user.commands[i].id%>" autocomplete="off" type="text"
+                                        class="response" style="resize: both;"><%=user.commands[i].response%></textarea>
+                                </td>
+                                <td>
+                                    <input id="cooldown_<%=user.commands[i].id%>" autocomplete="off" type="number"
+                                        class="cooldown" value="<%=user.commands[i].cooldown%>">
+                                </td>
+                                <td>
+                                    <select class="rank" autocomplete="off" id="rank_<%=user.commands[i].id%>">
+                                        <option value="everyone" <% if (user.commands[i].permission=="everyone" ) { %>
+                                            selected<% } %>>Everyone</option>
+                                        <option value="moderator" <% if (user.commands[i].permission=="moderator" ) { %>
+                                            selected<% } %>
+                                                >Moderator</option>
+                                        <option value="owner" <% if (user.commands[i].permission=="owner" ) { %>selected
+                                            <% } %>>Owner
+                                        </option>
+                                        <option value="verified" <% if (user.commands[i].permission=="verified" ) { %>
+                                            selected<% } %>>Verified</option>
+                                        <option value="member" <% if (user.commands[i].permission=="member" ) { %>
+                                            selected
+                                            <% } %>>Member
+                                        </option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input autocomplete="off" type="checkbox" class="default" onclick="return false;" <%
+                                        if (user.commands[i].default) { %>checked<% } %>>
+                                </td>
+                                <td>
+                                    <input value="<%=user.commands[i].used%>" id="use_<%=user.commands[i].id%>"
+                                        autocomplete="off" type="number">
+                                </td>
+                                <td>
+                                    <button onclick="updateUses('<%=user.commands[i].id%>')">Count</button>
+                                    <button class="saveCommand" id="<%=user.commands[i].id%>"
+                                        onclick="editCommand(this)">Save</button>
+                                </td>
+                                <td><button class="removeCommand" command="<%=user.commands[i].command%>"
+                                        onclick="removeCommand(this)">Remove</button>
+                                </td>
+                            </tr>
+                            <% } %>
+                </table>
+                <hr>
+                <h2>Varibles</h2>
+                <label>These are the varibles you can use in your commands:</label>
+                <table>
+                    <tr>
+                        <td>Varible</td>
+                        <td>Output</td>
+                        <td>Example Command</td>
+                        <td>Example Use</td>
+                        <td>Example Output</td>
+                    </tr>
+                    <tr>
+                        <td>{query}</td>
+                        <td>Gets messages after command</td>
+                        <td>{query}</td>
+                        <td>!echo Hello World!</td>
+                        <td>Hello World!</td>
+                    </tr>
+                    <tr>
+                        <td>{ownerName}</td>
+                        <td>Gets the username of the live stream owner</td>
+                        <td>{ownerName}</td>
+                        <td>!owner</td>
+                        <td>AJ</td>
+                    </tr>
+                    <tr>
+                        <td>{ownerID}</td>
+                        <td>Gets the ID of the live stream owner</td>
+                        <td>{ownerID}</td>
+                        <td>!owner</td>
+                        <td>123456789</td>
+                    </tr>
+                    <tr>
+                        <td>{ownerUrl}</td>
+                        <td>Gets the URL of the live stream owner</td>
+                        <td>{ownerUrl}</td>
+                        <td>!owner</td>
+                        <td>https://www.youtube.com/user/aj</td>
+                    </tr>
+                    <tr>
+                        <td>{ownerDescription}</td>
+                        <td>Gets the description of the live stream owner</td>
+                        <td>{ownerDescription}</td>
+                        <td>!owner</td>
+                        <td>Hi, I'm AJ!</td>
+                    </tr>
+                    <tr>
+                        <td>{authorName}</td>
+                        <td>Gets the username of the user who sent the message</td>
+                        <td>{authorName}</td>
+                        <td>!name</td>
+                        <td>AJ</td>
+                    </tr>
+                    <tr>
+                        <td>{messageId}</td>
+                        <td>Gets the ID of the message</td>
+                        <td>{messageId}</td>
+                        <td>!msgID</td>
+                        <td>123456789</td>
+                    </tr>
+                    <tr>
+                        <td>{messageTimestamp}</td>
+                        <td>Gets the timestamp of the message</td>
+                        <td>{messageTimestamp}</td>
+                        <td>!time</td>
+                        <td>123456789</td>
+                    </tr>
+                    <tr>
+                        <td>{authorChannelId}</td>
+                        <td>Gets the ID of the user who sent the message</td>
+                        <td>{authorChannelId}</td>
+                        <td>!id</td>
+                        <td>123456789</td>
+                    </tr>
+                    <tr>
+                        <td>{authorPhoto}</td>
+                        <td>Gets the profile picture of the user who sent the message</td>
+                        <td>{authorPhoto}</td>
+                        <td>!photo</td>
+                        <td>https://yt3.ggpht.com/-QX4Y4Y4Y4Y4/AAAAAAAAAAI...</td>
+                    </tr>
+                    <tr>
+                        <td>{membership}</td>
+                        <td>Gets the membership status of the user who sent the message</td>
+                        <td>{membership}</td>
+                        <td>!membership</td>
+                        <td>undefined OR 3 months</td>
+                    </tr>
+                    <tr>
+                        <td>{authorRank}</td>
+                        <td>Gets the rank of the user who sent the message</td>
+                        <td>{authorRank}</td>
+                        <td>!rank</td>
+                        <td>moderator</td>
+                    </tr>
+                    <tr>
+                        <td>{authorCustomRole}</td>
+                        <td>Gets the custom role of the user who sent the message</td>
+                        <td>{authorCustomRole}</td>
+                        <td>!role</td>
+                        <td>Custom Role Name</td>
+                    </tr>
+                    <tr>
+                        <td>{rawMessage}</td>
+                        <td>Gets the raw message</td>
+                        <td>{rawMessage}</td>
+                        <td>!raw</td>
+                        <td>!raw</td>
+                    </tr>
+                    <tr>
+                        <td>{math expression}</td>
+                        <td>Calculates the expression</td>
+                        <td>{math {query}}</td>
+                        <td>!math 1+1</td>
+                        <td>2</td>
+                    </tr>
+                    <tr>
+                        <td>{authorPoints}</td>
+                        <td>Gets the points of the user who sent the message</td>
+                        <td>{authorPoints}</td>
+                        <td>!points</td>
+                        <td>100</td>
+                    </tr>
+                    <tr>
+                        <td>{authorHours}</td>
+                        <td>Gets the hours of the user who sent the message</td>
+                        <td>{authorHours}</td>
+                        <td>!hours</td>
+                        <td>100</td>
+                    </tr>
+                    <tr>
+                        <td>{authorXP}</td>
+                        <td>Gets the xp of the user who sent the message</td>
+                        <td>{authorXP}</td>
+                        <td>!xp</td>
+                        <td>100</td>
+                    </tr>
+                    <tr>
+                        <td>{authorMessages}</td>
+                        <td>Gets the messages of the user who sent the message</td>
+                        <td>{authorMessages}</td>
+                        <td>!messages</td>
+                        <td>100</td>
+                    </tr>
+                    <tr>
+                        <td>{authorDaily}</td>
+                        <td>Gets the amount of points/messages/hours/xp gained in the past 24 hours</td>
+                        <td>{authorDaily}</td>
+                        <td>!daily</td>
+                        <td>Points: 100, Messages: 100, Hours: 100, XP: 100</td>
+                    </tr>
+                    <tr>
+                        <td>{authorWeekly}</td>
+                        <td>Gets the amount of points/messages/hours/xp gained the the past 7 days</td>
+                        <td>{authorWeekly}</td>
+                        <td>!weekly</td>
+                        <td>Points: 100, Messages: 100, Hours: 100, XP: 100</td>
+                    </tr>
+                    <tr>
+                        <td>{authorMonthly}</td>
+                        <td>Gets the amount of points/messages/hours/xp gained the the past 30 days</td>
+                        <td>{authorMonthly}</td>
+                        <td>!monthly</td>
+                        <td>Points: 100, Messages: 100, Hours: 100, XP: 100</td>
+                    </tr>
+                    <tr>
+                        <td>{addCommand}</td>
+                        <td>Adds a command</td>
+                        <td>{addCommand {query}}</td>
+                        <td>!addcom</td>
+                        <td>100</td>
+                    </tr>
+                    <tr>
+                        <td>{deleteCommand}</td>
+                        <td>Removes a command</td>
+                        <td>{deleteCommand {query}}</td>
+                        <td>!removecom</td>
+                        <td>100</td>
+                    </tr>
+                    <tr>
+                        <td>{editCommand}</td>
+                        <td>Edits a command</td>
+                        <td>{editCommand {query}}</td>
+                        <td>!editcom</td>
+                        <td>100</td>
+                    </tr>
+                    <tr>
+                        <td>{votes}</td>
+                        <td>Gets the number of votes</td>
+                        <td>{votes}</td>
+                        <td>!votes</td>
+                        <td>vote has 100 votes!</td>
+                    </tr>
+                    <tr>
+                        <td>{cmdUses}</td>
+                        <td>Gets the number of times the command has been used</td>
+                        <td>{cmdName} has been used {cmdUses} times</td>
+                        <td>!use</td>
+                        <td>!use has been used 100 times</td>
+                    </tr>
+                    <tr>
+                        <td>{cmdName}</td>
+                        <td>Gets the name of the command</td>
+                        <td>this command is called {cmdName}</td>
+                        <td>!name</td>
+                        <td>this command is called !name</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="giveaway tab"><br>
+                <div style="display: grid; grid-template-columns: 2fr 5fr;">
+                    <div id="entered" style="border: solid 5px #fff;">
+                        <%if (user.giveaway.winner) {%>
+                            <h2>Winner:</h2>
+                            <% let user2=user.users.find(user3=> user3.id == user.giveaway.winner) %>
+                                <div class="entry" style="text-align: left;">
+                                    <img src="<%=user2.photo%>" alt="<%=user2.name%>"
+                                        style="float: left; height: 5vh; width: 5vh; border-radius: 50%; margin-right: 1vw;">
+                                    <h2>
+                                        <%=user2.name%>
+                                    </h2>
+                                </div>
+                                <hr>
+                                <%}%>
+                                    <h2>Entries:</h2>
+                                    <% user.giveaway.entries.forEach(function(entry) { %>
+                                        <% let user2=user.users.find(user=> user.id == entry) %>
+                                            <% if (user2) { %>
+                                                <div class="entry" style="text-align: left;">
+                                                    <img src="<%=user2.photo%>" alt="<%=user2.name%>"
+                                                        style="float: left; height: 5vh; width: 5vh; border-radius: 50%; margin-right: 1vw;">
+                                                    <h2>
+                                                        <%=user2.name%>
+                                                    </h2>
+                                                </div>
+                                                <% } %>
+                                                    <% }) %>
+                    </div>
+                    <div>
+                        <h2 id="genabled">Enabled: <%=user.giveaway.enabled%>
+                        </h2>
+                        <hr><br>
+                        <label>Giveaway Command</label><br><input id="command" type="text"
+                            placeholder="Giveaway Command" autocomplete="off" value="<%=user.giveaway.command%>"
+                            style="font-size: 2vw;"><br><br>
+                        <label>Giveaway Prize</label><br><input id="prize" type="text" placeholder="Giveaway Prize"
+                            autocomplete="off" value="<%=user.giveaway.prize%>" style="font-size: 2vw;"><br><br>
+                        <label>Entry Rank</label><br><select id="entryrank" style="font-size: 2vw;">
+                            <option value="everyone" <% if (user.giveaway.entryRank=="everyone" ) { %>selected<% } %>>
+                                    Everyone</option>
+                            <option value="moderator" <% if (user.giveaway.entryRank=="moderator" ) { %>selected<% } %>>
+                                    Moderator</option>
+                            <option value="owner" <% if (user.giveaway.entryRank=="owner" ) { %>selected<% } %>>
+                                    Owner</option>
+                            <option value="verified" <% if (user.giveaway.entryRank=="verified" ) { %>selected<% } %>>
+                                    Verified</option>
+                            <option value="member" <% if (user.giveaway.entryRank=="member" ) { %>selected<% } %>>
+                                    Member</option>
+                        </select>
+                        <hr><br>
+                        <label>Currency Entry Requirement</label><br><select id="requirementType"
+                            style="font-size: 2vw;">
+                            <option value="none" <% if (user.giveaway.requirementType=="none" ) { %>selected<% } %>>
+                                    None</option>
+                            <option value="messages" <% if (user.giveaway.requirementType=="messages" ) { %>selected<% }
+                                    %>>
+                                    Messages</option>
+                            <option value="points" <% if (user.giveaway.requirementType=="points" ) { %>selected<% } %>>
+                                    Points</option>
+                            <option value="hours" <% if (user.giveaway.requirementType=="hours" ) { %>selected<% } %>>
+                                    Hours</option>
+                            <option value="xp" <% if (user.giveaway.requirementType=="xp" ) { %>selected<% } %>>
+                                    XP</option>
+                        </select>
+                        <hr><br>
+                        <label>Requirement Amount</label><br><input id="requirementAmount" type="number"
+                            placeholder="Requirement Amount" autocomplete="off"
+                            value="<%=user.giveaway.requirementAmount%>" style="font-size: 2vw;"><br><br>
+                        <br><br>
+                        <button onclick="saveGiveaway()" style="border: solid 0.3vw #FFF; font-size: 2vw;">Save
+                            Giveaway</button>
+                        <button onclick="startGiveaway()" style="border: solid 0.3vw #FFF; font-size: 2vw;">Start
+                            Giveaway</button>
+                        <button onclick="endGiveaway()" style="border: solid 0.3vw #FFF; font-size: 2vw;">End
+                            Giveaway</button><br><br>
+                        <button onclick="rerollGiveaway()" style="border: solid 0.3vw #FFF; font-size: 2vw;">Reroll
+                            Giveaway</button>
+                        <button onclick="clearGiveaway()" style="border: solid 0.3vw #FFF; font-size: 2vw;">Clear
+                            Giveaway</button>
+                        <br><br>
+                    </div>
+                </div>
+            </div>
+            <div class="timers tab">
+                <button onclick="addTimer()" style="border: solid 0.3vw #FFF; font-size: 2vw;">
+                    Add Timer
+                </button>
+                <table id="t">
+                    <tr>
+                        <th>Text</th>
+                        <th>Interval (in seconds)</th>
+                        <th>Enabled</th>
+                        <th>Save</th>
+                        <th>Remove</th>
+                    </tr>
+                    <% for (var i=0; i < user.timers.length; i++) { %>
+                        <tr>
+                            <td>
+                                <input id="timer_text_<%=user.timers[i].id%>" autocomplete="off" type="text"
+                                    class="command" value="<%=user.timers[i].text%>">
+                            </td>
+                            <td>
+                                <input id="timer_interval_<%=user.timers[i].id%>" autocomplete="off" type="text"
+                                    class="response" value="<%=user.timers[i].interval%>">
+                            </td>
+                            <td>
+                                <input id="timer_enabled_<%=user.timers[i].id%>" autocomplete="off" type="checkbox"
+                                    class="response" <% if (user.timers[i].enabled) { %> checked <% } %>>
+                            </td>
+                            <td><button class="saveTimer" id="<%=user.timers[i].id%>"
+                                    onclick="editTimer(this)">Save</button>
+                            <td><button class="removeTimer" command="<%=user.timers[i].id%>"
+                                    onclick="removeTimer(this)">Remove</button>
+                            </td>
+                        </tr>
+                        <% } %>
+                </table>
+            </div>
+            <div class="quotes tab"><br>
+                <% for (var i=0; i < user.quotes.length; i++) { %>
+                    <div class="quoteText" style="font-size: 3vw;">
+                        <%=user.quotes[i].quote%>, <%=new Date(parseFloat(user.quotes[i].time))%>
+                    </div>
+                    <% } %>
+            </div>
+            <div class="logs tab">
+                <table id="logs2" style="max-width: 80vw;">
+                    <tr>
+                        <th>Sender</th>
+                        <th>Sender ID</th>
+                        <th>Time</th>
+                        <th>Message</th>
+                    </tr>
+                    <% let length3=user.users.length; %>
+                    <% if (user.messages) { %>
+                        <% user.messages.reverse(); %>
+                        <%}%>
+                            <% if (user.messages.length>= 30) { %>
+                                <% length3=30; %>
+                                    <% } %>
+                                        <% for (var i=0; i < length3; i++) { %>
+                                            <tr
+                                                onclick="popup('log', '<%=user.messages[i].id%>', '<%=user.messages[i].authorName%>', '<%=user.messages[i].authorChannelId%>', '<%=user.messages[i].authorPhoto%>', '<%=user.messages[i].timestampUsec%>', '<%=stringify(user.messages[i].message)%>')">
+                                                <td>
+                                                    <%=user.messages[i].authorName%>
+                                                </td>
+                                                <td>
+                                                    <%=user.messages[i].authorChannelId%>
+                                                </td>
+                                                <td>
+                                                    <%=relativeTime(parseFloat(user.messages[i].timestampUsec))%>
+                                                </td>
+                                                <td>
+                                                    <%=stringify(user.messages[i].message)%>
+                                                </td>
+                                            </tr>
+                                            <% } %>
+                </table>
+                <button onclick="loadMoreLogs()">Load More</button>
+            </div>
+            <div class="moderation tab">
+                <label>Messages Per Minute</label><br><input id="messagesPerMinute" type="number"
+                    placeholder="Messages Per Minute" autocomplete="off" value="<%=user.moderation.messagesPerMinute%>"
+                    style="font-size: 2vw;"><br><br>
+                <label>Messages Per Minute Enabled</label><br><input id="messagesPerMinuteEnabled" type="checkbox"
+                    autocomplete="off" <% if (user.moderation.messagesPerMinuteEnabled) { %> checked <% } %>>
+                    <br><br>
+                    <hr>
+                    <label>Messages Per 10 Seconds</label><br><input id="messagesPer10Seconds" type="number"
+                        placeholder="Messages Per 10 Seconds" autocomplete="off"
+                        value="<%=user.moderation.messagesPer10Seconds%>" style="font-size: 2vw;"><br><br>
+                    <label>Messages Per 10 Seconds Enabled</label><br><input id="messagesPer10SecondsEnabled"
+                        type="checkbox" autocomplete="off" <% if (user.moderation.messagesPer10Seconds) { %> checked <%
+                        } %>>
+                        <br><br>
+                        <hr>
+                        <label>Moderation Enabled (overide)</label><br><input id="enabled" type="checkbox"
+                            autocomplete="off" <% if (user.moderation.enabled) { %> checked <% } %>>
+                            <br><br>
+                            <label>Warns Before Timeout</label><br><input id="warnsBeforeTimeout" type="number"
+                                placeholder="Warns Before Timeout" autocomplete="off"
+                                value="<%=user.moderation.warnsBeforeTimeout%>" style="font-size: 2vw;"><br><br>
+                            <button onclick="saveModeration()">Save</button>
+            </div>
+            <div class="counting tab">
+                <label>Counter Status: </label><button id="counterStatus" onclick="enableCounting()">
+                    <%if (user.settings.counting.enabled) { %>Enabled<% } else { %>Disabled<% } %>
+                </button><br><br>
+                <label>Counter</label><br><input id="counter" type="number" placeholder="Counter" autocomplete="off"
+                    value="<%=user.counting.number%>" style="font-size: 2vw;"><br><br>
+            </div>
+        </div>
+    </div>
+    <script>
+        function saveGiveaway() {
+            const giveaway = {
+                "prize": document.getElementById("prize").value,
+                "requirementAmount": document.getElementById("requirementAmount").value,
+                "requirementType": document.getElementById("requirementType").value,
+                "entryRank": document.getElementById("entryrank").value,
+                "command": document.getElementById("command").value,
+            }
+            fetch("/api/edit/giveaway", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(giveaway)
+            }).then(res => res.json()).then(json => {
+                if (json.success) {
+                    alert("Giveaway saved successfully!");
+                } else {
+                    alert("Error saving giveaway!");
+                }
+            })
+        }
+
+        function startGiveaway() {
+            fetch("/api/edit/giveaway", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ "start": "true" })
+            }).then(res => res.json()).then(json => {
+                if (json.success) {
+                    alert("Giveaway started successfully!");
+                } else {
+                    alert("Error starting giveaway!");
+                }
+            })
+        }
+
+        function endGiveaway() {
+            fetch("/api/edit/giveaway", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ "stop": "true" })
+            }).then(res => res.json()).then(json => {
+                if (json.success) {
+                    alert("Giveaway ended successfully!");
+                } else {
+                    alert("Error ending giveaway!");
+                }
+            })
+        }
+
+        function clearGiveaway() {
+            fetch("/api/edit/giveaway", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ "clear": "true" })
+            }).then(res => res.json()).then(json => {
+                if (json.success) {
+                    alert("Giveaway cleared successfully!");
+                } else {
+                    alert("Error clearing giveaway!");
+                }
+            })
+        }
+
+        function rerollGiveaway() {
+            fetch("/api/edit/giveaway", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ "reroll": "true" })
+            }).then(res => res.json()).then(json => {
+                if (json.success) {
+                    alert("Giveaway rerolled successfully!");
+                } else {
+                    alert("Error rerolling giveaway!");
+                }
+            })
+        }
+
+        function relativeTime(previous) {
+            if (previous === 0) {
+                return "never"
+            }
+            previous = parseInt(previous) / 1000;
+            const date = new Date();
+            const timestamp = date.getTime();
+            previous = Math.floor(previous / 1000)
+            const difference = Math.floor(timestamp / 1000) - previous;
+            let output = ``;
+            if (difference < 60) {
+                if (difference === 1) {
+                    output = `${difference} second ago`;
+                } else {
+                    output = `${difference} seconds ago`;
+                }
+            } else if (difference < 3600) {
+                if (difference === 1) {
+                    output = `${Math.floor(difference / 60)} minute ago`;
+                } else {
+                    output = `${Math.floor(difference / 60)} minutes ago`;
+                }
+            } else if (difference < 86400) {
+                if (difference === 1) {
+                    output = `${Math.floor(difference / 3600)} hour ago`;
+                } else {
+                    output = `${Math.floor(difference / 3600)} hours ago`;
+                }
+            } else if (difference < 2620800) {
+                if (difference === 1) {
+                    output = `${Math.floor(difference / 86400)} day ago`;
+                } else {
+                    output = `${Math.floor(difference / 86400)} days ago`;
+                }
+            } else if (difference < 31449600) {
+                if (difference === 1) {
+                    output = `${Math.floor(difference / 2620800)} month ago`;
+                } else {
+                    output = `${Math.floor(difference / 2620800)} months ago`;
+                }
+            } else {
+                if (difference === 1) {
+                    output = `${Math.floor(difference / 31449600)} year ago`;
+                } else {
+                    output = `${Math.floor(difference / 31449600)} years ago`;
+                }
+            }
+            return output;
+        }
+       
+        let pointHolder = [-15, 0]
+        let voteHolder = [0, 30]
+        let logHolder = [0, 30]
+        function loadMoreLogs() {
+            logHolder[0] += 30;
+            logHolder[1] += 30;
+            fetch('/api/view/logs?min=' + logHolder[0] + "&max=" + logHolder[1])
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (myJson) {
+                    for (var i = 0; i < myJson.length; i++) {
+                        document.getElementById("logs2").innerHTML += `<tr onclick="popup('log', '${myJson[i].id}', '${myJson[i].authorName}', '${myJson[i].authorChannelId}', '${myJson[i].authorPhoto}', '${myJson[i].timestampUsec}', '${myJson[i].message}')">
+                        <td>${myJson[i].authorName}</td>
+                        <td>${myJson[i].authorChannelId}</td>
+                        <td>${relativeTime(parseFloat(myJson[i].timestampUsec))}</td>
+                        <td>${stringify(myJson[i].message)}</td>
+                    </tr>`
+                    }
+                });
+        }
+        function loadMoreVotes() {
+            voteHolder[0] += 30;
+            voteHolder[1] += 30;
+            fetch('/api/view/votes?min=' + voteHolder[0] + "&max=" + voteHolder[1])
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (myJson) {
+                    for (var i = 0; i < myJson.length; i++) {
+                        document.getElementById("vote").innerHTML += `<tr>
+                        <td>${myJson[i].name}</td>
+                        <td>${myJson[i].votes}</td>
+                    </tr>`
+                    }
+                });
+        }
+        function removeUser(id) {
+            let m = confirm("Are you sure you want to remove this user?");
+            if (!m) {
+                return;
+            } else {
+                fetch('/api/remove/user', {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ "id": id })
+                }).then(res => res.json()).then(json => {
+                    if (json.success) {
+                        alert("User removed successfully!");
+                        exitPopup();
+                    } else {
+                        alert("Error removing user!");
+                    }
+                })
+            }
+        }
+        function expandSearch() {
+            pointHolder[0] += 15;
+            pointHolder[1] += 15;
+            fetch('/api/view/search?min=' + pointHolder[0] + "&max=" + pointHolder[1], {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ "search": document.getElementById("search").value })
+            })
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (myJson) {
+                    for (var i = 0; i < myJson.length; i++) {
+                        if (!myJson[i].customRank) {
+                            myJson[i].customRank = ""
+                        }
+                        let memberthing = "No";
+                        if (myJson[i].membership) {
+                            memberthing = myJson[i].membership.since ? myJson[i].membership.since : "Unknown"
+                        } 
+                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}', '${myJson[i].warnings}', '${myJson[i].warns}')">
+                        <td><img src="${myJson[i].photo}" style="width: 50px; height: 50px;"></td>
+                        <td>${myJson[i].name}</td>
+                        <td>${myJson[i].points}</td>
+                        <td>${myJson[i].hours}</td>
+                        <td>${myJson[i].xp}</td>
+                        <td>${myJson[i].messages}</td>
+                        <td>${relativeTime(parseFloat(myJson[i].lastMSG))}</td>
+                        <td>${memberthing}</td>
+                        <td>${myJson[i].isModerator}</td>
+                        <td>${myJson[i].isVerified}</td>
+                        <td>${myJson[i].isOwner}</td>
+                        <td>${myJson[i].customRank}</td>
+                        <td>${myJson[i].warnings}</td>
+                    </tr>`
+                    }
+                });
+        }
+        function searchTable() {
+            pointHolder = [0, 15]
+            fetch('/api/view/search?min=' + pointHolder[0] + "&max=" + pointHolder[1], {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ "search": document.getElementById("search").value })
+            })
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (myJson) {
+                    document.getElementById("points").innerHTML = `<tr>
+                        <th>Image</th>
+                        <th>Username</th>
+                        <th>Points</th>
+                        <th>Hours</th>
+                        <th>XP</th>
+                        <th>Messages</th>
+                        <th>Last MSG</th>
+                        <th>Member</th>
+                        <th>Moderator</th>
+                        <th>Verified</th>
+                        <th>Owner</th>
+                        <th>Custom Rank</th>
+                        <th>Warns</th>
+                </tr>`
+                    for (var i = 0; i < myJson.length; i++) {
+                        if (!myJson[i].customRank) {
+                            myJson[i].customRank = ""
+                        }
+                        let memberthing = "No";
+                        if (myJson[i].membership) {
+                            memberthing = myJson[i].membership.since ? myJson[i].membership.since : "Unknown"
+                        }
+                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}', '${myJson[i].warnings}', '${myJson[i].warns}')">
+                        <td><img src="${myJson[i].photo}" style="width: 50px; height: 50px;"></td>
+                        <td>${myJson[i].name}</td>
+                        <td>${myJson[i].points}</td>
+                        <td>${myJson[i].hours}</td>
+                        <td>${myJson[i].xp}</td>
+                        <td>${myJson[i].messages}</td>
+                        <td>${relativeTime(parseFloat(myJson[i].lastMSG))}</td>
+                        <td>${memberthing}</td>
+                        <td>${myJson[i].isModerator}</td>
+                        <td>${myJson[i].isVerified}</td>
+                        <td>${myJson[i].isOwner}</td>
+                        <td>${myJson[i].customRank}</td>
+                        <td>${myJson[i].warnings}</td>
+                    </tr>`
+                    }
+                    document.getElementById('loadMore').setAttribute("onclick", "expandSearch()");
+                });
+        }
+        let sort1 = "points";
+        loadMorePoints();
+        function loadMorePoints() {
+            pointHolder[0] += 15;
+            pointHolder[1] += 15;
+            fetch('/api/view/any?type=points&min=' + pointHolder[0] + "&max=" + pointHolder[1] + "&sort=" + sort1)
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (myJson) {
+                    for (var i = 0; i < myJson.length; i++) {
+                        if (!myJson[i].customRank) {
+                            myJson[i].customRank = ""
+                        }
+                        let memberthing = "No";
+                        if (myJson[i].membership) {
+                            memberthing = myJson[i].membership.since ? myJson[i].membership.since : "Unknown"
+                        }
+                        document.getElementById("points").innerHTML += `<tr onclick="popup('user', '${myJson[i].id}', '${myJson[i].name}', '${myJson[i].photo}', '${myJson[i].points}', '${myJson[i].hours}', '${myJson[i].xp}', '${myJson[i].messages}', '${relativeTime(parseFloat(myJson[i].lastMSG))}', '${memberthing}', '${myJson[i].isModerator}', '${myJson[i].isVerified}', '${myJson[i].isOwner}', '${myJson[i].customRank}', '${myJson[i].warnings}', '${myJson[i].warns}')">
+                        <td><img src="${myJson[i].photo}" style="width: 50px; height: 50px;"></td>
+                        <td>${myJson[i].name}</td>
+                        <td>${myJson[i].points}</td>
+                        <td>${myJson[i].hours}</td>
+                        <td>${myJson[i].xp}</td>
+                        <td>${myJson[i].messages}</td>
+                        <td>${relativeTime(parseFloat(myJson[i].lastMSG))}</td>
+                        <td>${memberthing}</td>
+                        <td>${myJson[i].isModerator || myJson[i].isModerator}</td>
+                        <td>${myJson[i].isVerified}</td>
+                        <td>${myJson[i].isOwner}</td>
+                        <td>${myJson[i].customRank}</td>
+                        <td>${myJson[i].warnings}</td>
+                    </tr>`
+                    }
+                });
+        }
+        function sortTable() {
+            pointHolder[0] = -15;
+            pointHolder[1] = 0;
+            sort1 = document.getElementById("sortType").value;
+            document.getElementById("points").innerHTML = `
+                <tr>
+                        <th>Image</th>
+                        <th>Username</th>
+                        <th>Points</th>
+                        <th>Hours</th>
+                        <th>XP</th>
+                        <th>Messages</th>
+                        <th>LastMSG</th>
+                        <th>Member</th>
+                        <th>Moderator</th>
+                        <th>Verified</th>
+                        <th>Owner</th>
+                        <th>Custom Rank</th>
+                    </tr>`
+            loadMorePoints();
+        }
+
+        let displayed = [];
+        if (document.URL.includes('#')) {
+            document.getElementsByClassName(document.URL.split('#')[1])[0].style.display = "block";
+            document.getElementById(document.URL.split('#')[1]).style.backgroundColor = "grey";
+            for (var i = 0; i < document.getElementsByClassName("tab").length; i++) {
+                if (document.getElementsByClassName("tab")[i].classList.toString().includes(document.URL.split('#')[1])) {
+                    document.getElementsByClassName("tab")[i].style.display = "block";
+                } else {
+                    document.getElementsByClassName("tab")[i].style.display = "none";
+                }
+            }
+        } else {
+            document.getElementsByClassName("dashboard")[0].style.display = "block";
+            document.getElementById("dashboard").style.backgroundColor = "grey";
+        }
+        var tabs = document.getElementsByClassName("tab");
+        var tabLinks = document.getElementsByTagName("li");
+        for (var i = 0; i < tabLinks.length; i++) {
+            tabLinks[i].addEventListener("click", function () {
+                for (var j = 0; j < tabs.length; j++) {
+                    tabs[j].style.display = "none";
+                }
+                document.getElementsByClassName(this.id)[0].style.display = "block";
+                for (var k = 0; k < tabLinks.length; k++) {
+                    tabLinks[k].style.backgroundColor = "#141414";
+                }
+                this.style.backgroundColor = "grey";
+                document.location.hash = this.id;
+            });
+        }
+
+        document.getElementById("logout").addEventListener("click", function () {
+            let r = confirm("Are you sure you want to logout?");
+            if (r == true) {
+                window.location.href = "/logout";
+            } else {
+                return;
+            }
+        });
+
+        document.getElementById("chat").addEventListener("click", function () {
+            document.getElementById("chatBoard").scrollTop = document.getElementById("chatBoard").scrollHeight;
+        });
+
+        let chatInterval = setInterval(getChat, 5000);
+        function getChat() {
+            fetch('/api/view/chat')
+                .then(response => response.json())
+                .then(data => {
+                    data.messages = data.messages.sort((a, b) => parseFloat(a.timestampUsec) - parseFloat(b.timestampUsec))
+                    if (!data.success) {
+                        clearInterval(chatInterval);
+                        return;
+                    }
+                    let chat = document.getElementById("chatBoard");
+                    for (let i = 0; i < data.messages.length; i++) {
+                        if (!displayed.includes(data.messages[i].id)) {
+                            let message = document.createElement("div");
+                            message.classList.add("chat-item");
+                            message.setAttribute("id", data.messages[i].id);
+                            let color = "#FFF"
+                            if (data.messages[i].isOwner == true) {
+                                color = "#FFD700"
+                                console.log("owner", data.messages[i].authorName, data.messages[i])
+                            } else if (data.messages[i].isModerator == true) {
+                                color = "#00BFFF"
+                            } else if (data.messages[i].isVerified == true) {
+                                color = "#00FFFF"
+                            }
+                            message.innerHTML = `
+                            <img src="${data.messages[i].authorPhoto}" style="float: left; width: 50px; height: 50px; border-radius: 50%;">
+                            <p class="chatName" style="color: ${color}">${data.messages[i].authorName}</p>
+                            <p class="chatMessage">${stringify(data.messages[i].message)}</p>`
+                            message.onclick = function () { popup('chat', data.messages[i].id + '', '' + data.messages[i].authorName + '', '' + data.messages[i].authorChannelId + '', '' + data.messages[i].authorPhoto + '', '' + data.messages[i].timestamp + '', '' + data.messages[i].message + '') }
+                            chat.appendChild(message);
+                            displayed.push(data.messages[i].id);
+                            document.getElementById("chatBoard").scrollTop = document.getElementById("chatBoard").scrollHeight;
+                        }
+                    }
+                });
+        }
+        getChat();
+
+        let open = false;
+        let openID = "";
+        let pop = document.createElement("div");
+        pop.classList.add("popup");
+        function popup(type, id, name, channelID, photo, timestamp, message, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) {
+            if (open) {
+                exitPopup()
+            } else {
+                if (openID == id) {
+                    exitPopup();
+                    open = false;
+                    openID = "";
+                    return;
+                } else {
+                    exitPopup();
+                    open = false;
+                    openID = "";
+                }
+            }
+            if (type == 'user') {
+                for (var e = 0; e < i.length; e++) {
+                    i[e] = `<p>${i[e]}</p>`
+                }
+                pop.innerHTML = `
+                                <div class="popup-content">
+                                    <img src="${channelID}" style="width: 50px; height: 50px; border-radius: 50%;"><br>
+                                    <input type="text" id="photo" value="${channelID}"><button onclick="updateUser('photo', '${id}')">Update</button><br>
+                                    <p>Name: <input type="text" id="name" value="${name}"><button onclick="updateUser('name', '${id}')">Update</button></p>
+                                    <p>User ID: <input type="text" id="id" value="${id}"></p>
+                                    <p>Last MSG: <input type="text" id="lastMsg" value="${b}"></p>
+                                    <p>Points: <input type="text" id="points2" value="${photo}"><button onclick="updateUser('points', '${id}')">Update</button></p>
+                                    <p>Messages: <input type="text" id="messages" value="${a}"><button onclick="updateUser('messages', '${id}')">Update</button></p>
+                                    <p>Hours: <input type="text" id="hours" value="${timestamp}"><button onclick="updateUser('hours', '${id}')">Update</button></p>
+                                    <p>XP: <input type="text" id="xp" value="${message}"><button onclick="updateUser('hours', '${id}')">Update</button></p>
+                                    <p>Member: <input type="text" id="member" value="${c}"></p>
+                                    <p>Moderator: <input type="text" id="moderator" value="${d}"></p>
+                                    <p>Verified: <input type="text" id="verified" value="${e}"></p>
+                                    <p>Owner: <input type="text" id="owner" value="${f}"></p>
+                                    <p>Custom Rank: <input type="text" id="customRank" value="${g}"><button onclick="updateUser('customRank', '${id}')">Update</button></p>
+                                    <p>Warnings: <input type="text" id="warnings" value="${h}"></p>
+                                    <p>All Warnings:</p>
+                                    <p>${i}</p>
+                                    <button onclick="updateUser('warnings', '${id}')">Clear Warnings</button>
+                                    <br>
+                                    <div style="display:flex; width: 100%; justify-content: space-between;">
+                                    <button class="popup-button" id="deleteUser" onclick="removeUser('${id}')">Delete</button>
+                                    <button class="popup-button" id="exit" onclick="exitPopup()">Exit</button>
+                                    </div>
+                                </div>`
+                document.body.appendChild(pop);
+            } else {
+                let a = ``
+                if (type == "chat") {
+                    a = `<p>Message Options</p>
+                                    <button class="popup-button" id="delete" onclick="deleteMsg('${id}')">Delete</button>
+                                    <button class="popup-button" id="ban" onclick="banUser('${channelID}')">Ban</button>
+                                    <button class="popup-button" id="timeout" onclick="timeoutUser('${channelID}')">Timeout</button>
+                                    <hr>`
+                }
+                pop.innerHTML = `
+                                <div class="popup-content">
+                                    ${a}
+                                    <p>Message ID: ${id}</p>
+                                    <p>Author Name: ${name}</p>
+                                    <p>Author Channel ID: ${channelID}</p>
+                                    <img src="${photo}" style="width: 50px; height: 50px; border-radius: 50%;">
+                                    <p>Timestamp: ${timestamp}</p>
+                                    <p>Message: ${stringify(message)}</p>
+                                    <br>
+                                    <button class="popup-button" id="exit" onclick="exitPopup()">Exit</button>
+                                </div>`
+                document.body.appendChild(pop);
+            }
+        }
+
+        function exitPopup() {
+            pop.remove();
+            open = false;
+            openID = "";
+        }
+
+        function updateUser(type, id) {
+            if (type == 'points') {
+                type = 'points2';
+            }
+            let value = document.getElementById(type).value;
+            if (type == 'points2') {
+                type = 'points';
+            }
+            fetch('/api/edit/user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    type: type,
+                    id: id,
+                    value: value
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        exitPopup();
+                        alert("User Updated");
+                    }
+                });
+        }
+
+        function deleteMsg(id) {
+            fetch('/api/chat/deleteMsg', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id: id
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById(id).remove();
+                        exitPopup();
+                        alert("Message Deleted");
+                    }
+                });
+        }
+
+        function timeoutUser(id) {
+            fetch('/api/chat/timeout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id: id
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        exitPopup();
+                        alert("User Timed Out");
+                    }
+                });
+        }
+
+        function banUser(id) {
+            fetch('/api/chat/ban', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id: id
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        exitPopup();
+                        alert("User Banned");
+                    }
+                });
+        }
+
+        function stringify(message) {
+            if (typeof message == "string") return message;
+            let string = "";
+            for (let i = 0; i < message.length; i++) {
+                if (message[i]['text']) {
+                    string += message[i].text;
+                } else {
+                    string += message[i].emojiId;
+                }
+            }
+            return string;
+        }
+
+        function addCommand() {
+            //open popup
+            let pop = document.createElement("div");
+            pop.className = "popup";
+            pop.id = "popup";
+            pop.innerHTML = `
+                                <div class="popup-content">
+                                    <p>Add Command</p>
+                                    <p>Name: <input type="text" id="CMDname"></p>
+                                    <p>Response: <input type="text" id="CMDresponse"></p>
+                                    <p>Cooldown: <input type="text" id="CMDcooldown"></p>
+                                    <p>Rank: <select id="CMDselect">
+                                                <option value="owner">Owner</option>
+                                                <option value="moderator">Moderator</option>
+                                                <option value="verified">Verified</option>
+                                                <option value="member">Member</option>
+                                                <option value="everyone">Everyone</option>
+                                            </select></p>
+                                    <br>
+                                    <button class="popup-button" id="add" onclick="addCMD()">Add</button>
+                                    <button class="popup-button" id="exit" onclick="exitPopup2()">Exit</button>
+                                </div>`
+            document.body.appendChild(pop);
+        }
+
+        function addCMD() {
+            let name = document.getElementById("CMDname").value;
+            let response = document.getElementById("CMDresponse").value;
+            let cooldown = document.getElementById("CMDcooldown").value;
+            let rank = document.getElementById("CMDselect").value;
+            let data = {
+                name: name,
+                response: response,
+                cooldown: cooldown,
+                rank: rank
+            }
+            let rankOptions = ["owner", "moderator", "verified", "member", "everyone"];
+            if (name == null || response == null || cooldown == null || rank == null || name == "" || response == "" || cooldown == "" || rank == "") {
+                alert("You must fill out all fields!");
+                return;
+            }
+            if (!rankOptions.includes(rank)) {
+                alert("Invalid rank!");
+                return;
+            }
+            if (isNaN(cooldown)) {
+                alert("Cooldown must be a number!");
+                return;
+            }
+            fetch('/api/add/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Command added successfully!");
+                        location.reload();
+                    } else {
+                        alert("Command failed to add!");
+                    }
+                });
+        }
+
+        function exitPopup2() {
+            document.getElementById("popup").remove();
+        }
+
+        function addTimer() {
+            let text = prompt("Enter the timer's text", "");
+            let interval = prompt("Enter the timer's interval in seconds", "");
+            let data = {
+                text: text,
+                interval: interval
+            }
+            if (text == null || interval == null || text == "" || interval == "") {
+                alert("You must fill out all fields!");
+                return;
+            }
+            if (isNaN(interval)) {
+                alert("Interval must be a number!");
+                return;
+            }
+            fetch('/api/add/timer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Timer added successfully!");
+                        location.reload();
+                    } else {
+                        alert("Timer failed to add! (" + data.error + ")");
+                    }
+                });
+        }
+
+        function editTimer(that) {
+            let id = that.getAttribute("id");
+            let text = document.getElementById("timer_text_" + id).value;
+            let interval = document.getElementById("timer_interval_" + id).value;
+            let enabled = document.getElementById("timer_enabled_" + id).checked;
+            let data = {
+                id: id,
+                text: text,
+                interval: interval,
+                enabled: enabled
+            }
+            if (text == null || interval == null || text == "" || interval == "") {
+                alert("You must fill out all fields!");
+                return;
+            }
+            if (isNaN(interval)) {
+                alert("Interval must be a number!");
+                return;
+            }
+            fetch('/api/edit/timer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Timer saved successfully!");
+                        location.reload();
+                    } else {
+                        alert("Timer failed to save! (" + data.error + ")");
+                    }
+                });
+        }
+
+        function removeTimer(that) {
+            let continuer = confirm("Are you sure you want to remove this timer?");
+            if (!continuer) {
+                return;
+            }
+            let id = that.getAttribute("command");
+            let data = {
+                id: id
+            }
+            fetch('/api/remove/timer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Timer removed successfully!");
+                        location.reload();
+                    } else {
+                        alert("Timer failed to remove!");
+                    }
+                });
+        }
+
+        function removeCommand(that) {
+            let continuer = confirm("Are you sure you want to remove this command?");
+            if (!continuer) {
+                return;
+            }
+            let name = that.getAttribute("command");
+            let data = {
+                name: name
+            }
+            fetch('/api/remove/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Command removed successfully!");
+                        location.reload();
+                    } else {
+                        alert("Command failed to remove!");
+                    }
+                });
+        }
+
+        function editCommand(that) {
+            let name = document.getElementById("command_" + that.getAttribute('id')).value;
+            let response = document.getElementById("response_" + that.getAttribute('id')).value;
+            let cooldown = document.getElementById("cooldown_" + that.getAttribute('id')).value;
+            let rank = document.getElementById("rank_" + that.getAttribute('id')).value;
+            let data = {
+                name: name,
+                response: response,
+                cooldown: cooldown,
+                rank: rank,
+                id: that.getAttribute('id')
+            }
+            let rankOptions = ["owner", "moderator", "verified", "member", "everyone"];
+            if (name == null || response == null || cooldown == null || rank == null || name == "" || response == "" || cooldown == "" || rank == "") {
+                alert("You must fill out all fields!");
+                return;
+            }
+            if (!rankOptions.includes(rank)) {
+                alert("Invalid rank!");
+                return;
+            }
+            if (isNaN(cooldown)) {
+                alert("Cooldown must be a number!");
+                return;
+            }
+            fetch('/api/edit/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Command edited successfully!");
+                        location.reload();
+                    } else {
+                        alert("Command failed to edit!");
+                    }
+                });
+        }
+
+        function updateGiveaway() {
+            fetch('/api/view/giveaway')
+                .then(response => response.json())
+                .then(data => {
+                    let winner = ""
+                    if (data.winner) {
+                        winner = `<h2>Winner:</h2><div class="entry" style="text-align: left;">
+                                    <img src="${data.winner.photo}" alt="${data.winner.name}" style="float: left; height: 5vh; width: 5vh; border-radius: 50%; margin-right: 1vw;">
+                                    <h2>${data.winner.name}</h2>
+                                </div><hr>`
+                    }
+                    document.getElementById("genabled").innerHTML = "Enabled: " + data.enabled
+                    document.getElementById("entered").innerHTML = `
+                    ${winner}
+                    <h2>Entries:</h2>
+                    ${data.entries.map(entry => {
+                        return `<div class="entry" style="text-align: left;">
+                                    <img src="${entry.photo}" alt="${entry.name}" style="float: left; height: 5vh; width: 5vh; border-radius: 50%; margin-right: 1vw;">
+                                    <h2>${entry.name}</h2>
+                                </div><hr>`
+                    }).join("")}
+                    `
+                })
+        }
+        setInterval(updateGiveaway, 10000)
+
+        function updateUses(id) {
+            fetch('/api/edit/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id: id, used: document.getElementById("use_" + id).value })
+            }).then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Command edited successfully!");
+                        location.reload();
+                    } else {
+                        alert("Command failed to edit!");
+                    }
+                });
+        }
+
+        function checkforstream() {
+            fetch('/api/checkforstream', {
+                method: 'POST'
+            }).then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert("Failed to find stream!");
+                    }
+                })
+        }
+
+        function enableBot() {
+            fetch('/api/settings/enable').then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Bot " + data.enabled + "!");
+                        location.reload();
+                    } else {
+                        alert("Failed to enable bot!");
+                    }
+                })
+        }
+
+        function enableCounting() {
+            fetch('/api/settings/counting').then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Counting " + data.enabled + "!");
+                        location.reload();
+                    } else {
+                        alert("Failed to enable bot!");
+                    }
+                })
+        }
+
+        function enableCurrency() {
+            fetch('/api/settings/currency').then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Currency " + data.enabled + "!");
+                        location.reload();
+                    } else {
+                        alert("Failed to enable currency!");
+                    }
+                })
+        }
+
+        function saveModeration() {
+            fetch("/api/settings/moderation", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    moderation: {
+                        messagesPerMinute: document.getElementById('messagesPerMinute').value,
+                        messagesPerMinuteEnabled: document.getElementById('messagesPerMinuteEnabled').checked,
+                        enabled: document.getElementById('enabled').checked,
+                        warnsBeforeTimeout: document.getElementById('warnsBeforeTimeout').value,
+                        messagesPer10Seconds: document.getElementById('messagesPer10Seconds').value,
+                        messagesPer10SecondsEnabled: document.getElementById('messagesPer10SecondsEnabled').checked
+                    }
+                })
+            }).then(res => res.json()).then(json => {
+                if (json.success) {
+                    alert('Saved!');
+                } else {
+                    alert('Error: ' + json.error);
+                }
+            })
+        }
+
+        function showCode() {
+            document.getElementById("code").innerHTML = document.getElementById("code").getAttribute("code");
+        }
+    </script>
+</body>
+
+</html>

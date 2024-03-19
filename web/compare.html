@@ -1,0 +1,121 @@
+<style>
+    body {
+        background-color: #141414;
+        color: #FFF;
+        font-family: Arial, Helvetica, sans-serif;
+        text-align: center;
+    }
+    button {
+        cursor: pointer;
+    }
+</style>
+
+<body>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr);">
+        <div>
+        <input placeholder="Search" id="search1" style="margin-top: 10px; width: 90%; height: 50px;">
+        <button style="color: #FFF; height: 37px; width: 100px; box-sizing: border-box; display: inline-block; border-radius: 0.25rem; border: solid #FFF 1px; background-color: #202020;"
+            onclick="search1()" style="margin-top: 20px;">Search</button>
+            <hr>
+            <div id="results1"></div>
+    </div>
+    <div>
+        <input placeholder="Search" id="search2" style="margin-top: 10px; width: 90%; height: 50px;">
+        <button style="color: #FFF; height: 37px; width: 100px; box-sizing: border-box; display: inline-block; border-radius: 0.25rem; border: solid #FFF 1px; background-color: #202020;"
+            onclick="search2()" style="margin-top: 20px;">Search</button>
+            <hr>
+            <div id="results2"></div>
+    </div>
+    </div>
+    <br>
+    <hr>
+    <br>
+    <center>
+        <button onclick="compare()" style="font-size: 3vw;">Compare!</button>
+    </center>
+    </body>
+    <script>
+        let ids = ["", ""]
+        function search1() {
+            document.getElementById('results1').innerHTML = ''
+            fetch('/public/currency/?offset=0&limit=15&sort=points&order=desc&search='+document.getElementById('search1').value, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    search: document.getElementById('search1').value
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    data.users.forEach(user => {
+                        document.getElementById('results1').innerHTML += `
+                        <div style="display: flex; margin-top: 10px;" id="u1_${user.id}">
+                            <img src="${user.photo}" style="height: 100px; width: 100px;">
+                            <div style="margin-left: 10px; text-align: left;">
+                                <h3 style="margin-top:-5px;">${user.name}</h3>
+                                <p style="margin-top:-10px;">${user.points.toLocaleString()} points, ${user.messages.toLocaleString()} messages</p>
+                                <p style="margin-top:-10px;">${user.xp.toLocaleString()} xp, ${user.hours.toLocaleString()} hours</p>
+                                <button style="margin-top:-10px;" onclick="select1('${user.id}')">Select</button>
+                            </div>
+                        </div>
+                        `
+                    })
+                })
+        }
+
+        function search2() {
+            document.getElementById('results2').innerHTML = ''
+            fetch('/public/currency/?offset=0&limit=15&sort=points&order=desc&search='+document.getElementById('search2').value, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    search: document.getElementById('search2').value
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    data.users.forEach(user => {
+                        document.getElementById('results2').innerHTML += `
+                        <div style="display: flex; margin-top: 10px;" id="u2_${user.id}">
+                            <img src="${user.photo}" style="height: 100px; width: 100px;">
+                            <div style="margin-left: 10px; text-align: left;">
+                                <h3 style="margin-top:-5px;">${user.name}</h3>
+                                <p style="margin-top:-10px;">${user.points.toLocaleString()} points, ${user.messages.toLocaleString()} messages</p>
+                                <p style="margin-top:-10px;">${user.xp.toLocaleString()} xp, ${user.hours.toLocaleString()} hours</p>
+                                <button style="margin-top:-10px;" onclick="select2('${user.id}')">Select</button>
+                            </div>
+                        </div>
+                        `
+                    })
+                })
+        }
+
+        function select1(id) {
+            if (ids[0] != "") {
+                document.getElementById("u1_" + ids[0]).style.border = 'none'
+            }
+            ids[0] = id
+            document.getElementById("u1_" + id).style.border = 'solid #FFF 2px'
+        }
+
+        function select2(id) {
+            if (ids[1] != "") {
+                document.getElementById("u2_" + ids[1]).style.border = 'none'
+            }
+            ids[1] = id
+            document.getElementById("u2_" + id).style.border = 'solid #FFF 2px'
+        }
+
+        function compare() {
+            if (ids[0] == "" || ids[1] == "") {
+                alert('Please select two channels to compare.')
+            } else {
+                window.location.href = '/public/compare?id1=' + ids[0] + '&id2=' + ids[1]
+            }
+        }
+    </script>
+</body>
