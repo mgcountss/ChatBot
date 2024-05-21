@@ -1,0 +1,174 @@
+{
+    "id": "",
+    "created": null,
+    "status": "offline",
+    "connection": {},
+    "messages": [],
+    "stream": {
+        "id": "",
+        "title": "",
+        "thumbnail": "",
+        "live": false,
+        "messages": 0,
+        "viewers": ""
+    },
+    "commands": [
+        {
+            "command": "!math",
+            "response": "{authorName}, {math {query}}",
+            "default": true,
+            "permission": "everyone",
+            "cooldown": 0,
+            "id": "wgrnja",
+            "used": 0
+        },
+        {
+            "command": "!addcom",
+            "response": "{addCommand {query}}",
+            "permission": "moderator",
+            "cooldown": 0,
+            "default": true,
+            "id": "wgrnjb",
+            "used": 0
+        },
+        {
+            "command": "!delcom",
+            "response": "{deleteCommand {query}}",
+            "permission": "moderator",
+            "cooldown": 0,
+            "default": true,
+            "id": "wgrnjc",
+            "used": 0
+        },
+        {
+            "command": "!editcom",
+            "response": "{editCommand {query}}",
+            "permission": "moderator",
+            "cooldown": 0,
+            "default": true,
+            "id": "wgrnjd",
+            "used": 0
+        },
+        {
+            "command": "!quote",
+            "response": "{addQuote {query}}",
+            "permission": "moderator",
+            "cooldown": 0,
+            "default": true,
+            "id": "wgrnje",
+            "used": 0
+        },
+        {
+            "command": "!delquote",
+            "response": "{deleteQuote {query}}",
+            "permission": "moderator",
+            "cooldown": 0,
+            "default": true,
+            "id": "wganjt",
+            "used": 0
+        },
+        {
+            "command": "!points",
+            "response": "{authorName} {ifBlock {authorCustomRole}} has {authorPoints} points",
+            "default": true,
+            "used": 0,
+            "cooldown": 0,
+            "permission": "everyone",
+            "id": "wgrhjt"
+        },
+        {
+            "command": "!hours",
+            "response": "{authorName} {ifBlock {authorCustomRole}} has {authorHours} hours",
+            "permission": "everyone",
+            "cooldown": 0,
+            "default": true,
+            "used": 0,
+            "id": "84g53n"
+        },
+        {
+            "command": "!messages",
+            "response": "{authorName} {ifBlock {authorCustomRole}} has {authorMessages} messages",
+            "permission": "everyone",
+            "cooldown": 0,
+            "default": true,
+            "used": 0,
+            "id": "tauhzx"
+        },
+        {
+            "command": "!vote",
+            "response": "{authorName} {ifBlock {authorCustomRole}} voted for {vote {query}} ({math {voteCount {query}} + 1})",
+            "permission": "everyone",
+            "cooldown": 30,
+            "default": true,
+            "used": 2707,
+            "id": "8tuf4g"
+        },
+        {
+            "command": "!daily",
+            "response": "{authorName} has gained {authorDaily} points in the past 24 hours.",
+            "permission": "everyone",
+            "cooldown": 0,
+            "default": false,
+            "used": 0,
+            "id": "y7hprl"
+        },
+        {
+            "command": "!weekly",
+            "response": "{authorName} has gained {authorWeekly} points in the past week.",
+            "permission": "everyone",
+            "cooldown": 0,
+            "default": false,
+            "used": 0,
+            "id": "raj39ce"
+        },
+        {
+            "command": "!rank",
+            "response": "{ifBlock {authorCustomRole}}",
+            "permission": "everyone",
+            "cooldown": 0,
+            "default": false,
+            "used": 0,
+            "id": "kj7sdc"
+        },
+        {
+            "command": "!monthly",
+            "response": "{authorName} has gained {authorMonthly} points in the past month.",
+            "permission": "everyone",
+            "cooldown": 0,
+            "default": false,
+            "used": 35,
+            "id": "0bz3k5"
+        }
+    ],
+    "quotes": [],
+    "timers": [],
+    "users": [],
+    "votes": [],
+    "giveaway": {
+        "enabled": false,
+        "winner": "",
+        "prize": "",
+        "entries": [],
+        "entryRank": "everyone",
+        "requirementAmount": "0",
+        "requirementType": "points",
+        "command": "!join"
+    },
+    "counting": {
+        "messages": [],
+        "number": 0,
+        "lastMSG": 0,
+        "users": []
+    },
+    "settings": {
+        "chatbot": {
+            "enabled": false
+        },
+        "counting": {
+            "enabled": true
+        },
+        "currency": {
+            "enabled": true
+        }
+    }
+}

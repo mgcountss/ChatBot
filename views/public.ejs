@@ -94,7 +94,7 @@
             lastSearch = search
             $('.counters').html('')
         }
-        fetch("/public/currency/?offset=" + offset + "&limit=" + limit + "&sort=" + sort + "&order=" + order + "" + search, {
+        fetch("/api/view/currency/?offset=" + offset + "&limit=" + limit + "&sort=" + sort + "&order=" + order + "" + search, {
             method: "POST",
             headers: {
                 'Content-Type': 'application/json'

@@ -11,7 +11,6 @@ const backup = async (id) => {
         giveaway: await db.getOne('giveaway'),
         ids: await db.getOne('ids'),
         messages: await db.getOne('messages'),
-        moderation: await db.getOne('moderation'),
         settings: await db.getOne('settings'),
         stream: await db.getOne('stream'),
         timers: await db.getOne('timers'),

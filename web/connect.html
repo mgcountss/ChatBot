@@ -106,7 +106,6 @@
         <li>Giveaways</li>
         <li>User Stats</li>
         <li>Timers</li>
-        <li>Chat Moderation</li>
     </ul>
     <hr>
     <script>
@@ -122,6 +121,8 @@
                 })
             }).then(res => res.json()).then(data => {
                 if (data.success) {
+                    alert('Login on the Electron app that appears')
+                    alert('After you see the YouTube homepage, exit the Electron app')
                     window.location.href = '/dashboard'
                 } else {
                     alert('Error: ' + data.error)
