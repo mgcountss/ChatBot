@@ -1,14 +1,18 @@
-# MGBot
+# MGBot lol
 ### This is the same chatbot I use in my 24/7 <a href="https://youtube.com/@sfmg/live">live stream</a>!
 
-## The setup guide below is outdated, I will update it soon though!
 ## How To Setup!
-To run the program, make sure you have <a href="https://nodejs.org">Node.js</a> v18.15.0 or higher.
-Next download the files and navigate to them within your command prompt/terminal. 
-Type <b>npm install</b> and wait for all packages to install. 
-Once they do run <b>node .</b> this will start up the bot. What you need to do now is navigate in a web browser to <b>http://localhost:8080</b>. 
-Then click <b>Get Started!</b> the channel ID is of the streamer account. 
-The other details are for the <b>BOT ACCOUNT (SO MAKE SURE YOU ARE LOGGED INTO IT)</b> can be found by going to https://youtube.com, opening inspect element (ctrl + shift + i). Then type <b>document.cookie</b> (MAKE SURE NOT TO SHARE THIS COOKIES). From here simply sort through so you only have the ones you need. Make sure to remove the quotes around them and semi-colons if there are any. After this submit it. From here, you need to do two things from the dashboard. 1. Click <b>Refresh Stream</b> to get your current live. And also enabled the bot (at the top of the page). From here the bot is yours to customize!
+To run the program, make sure you have <a href="https://nodejs.org">Node.js</a>. I use v18.20.1 but any version above 14 should work.
+1. Clone the repository by running `git clone https://github.com/mgcountss/ChatBot`
+2. Open the folder in your terminal and run `npm install` to install all the dependencies.
+3. Run the program by typing `node index.js` in the terminal.
+4. Open your browser and go to `http://localhost:8080` then click on `Get Started`.
+5. Enter in the streaming account's youtube channel id (ex. `https://youtube.com/channel/{channel_id}`), only enter the channel id though.
+6. Enter in the chatbot's youtube channel id (ex. `https://youtube.com/channel/{channel_id}`), only enter the channel id though.
+7. Click "Start", an Electron popup window should appear prompting you to login to your google account.
+8. Login to the **BOT ACCOUNT** and once you see the YouTube home page, close the window.
+9. The bot should now be running now and if it's not try clicking the "Refresh Stream!" button.
+10. If you have any issues, please join the <a href="https://discord.gg/v2PdpBk3Gm">discord</a> and ask for help.
 
 ## Contributing
 To contribute, simply **fork the repository**, edit the things you want to and **submit a pull request**.
