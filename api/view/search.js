@@ -4,7 +4,7 @@ import db from "../../functions/db.js";
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-
+//a
     let users = await db.getOne('users');
     if (users) {
         let things = [...users];
