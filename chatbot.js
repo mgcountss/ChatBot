@@ -1052,12 +1052,12 @@ async function sendMSG(message) {
                 }
                 messages.push(message);
                 for (let i = 0; i < messages.length; i++) {
-                    //mc.sendMessage(messages[i]).catch((error) => { })
+                    mc.sendMessage(messages[i]).catch((error) => { })
                 }
                 return;
             } else {
                 message = message.toString()
-                //mc.sendMessage(message).catch((error) => { })
+                mc.sendMessage(message).catch((error) => { })
                 return;
             }
         } else {

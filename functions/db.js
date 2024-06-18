@@ -181,6 +181,11 @@ const updateValue = async (type, key, value, key2, value2) => {
   } catch (error) { }
 }
 
+const returnDB = async () => {
+  let newDB = JSON.parse(JSON.stringify(db));
+  return newDB;
+}
+
 const syncDBToFiles = async () => {
   db = {
     commands: JSON.parse(fs.readFileSync('./user/db/commands.json', 'utf8')),
@@ -231,5 +236,6 @@ export default {
   addToWithinObject,
   findOne,
   updateValue,
-  syncDBToFiles
+  syncDBToFiles,
+  returnDB
 };

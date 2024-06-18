@@ -1,10 +1,10 @@
 import express from "express";
 import db from "../../functions/db.js";
-import logRoute from "../../functions/logRoute.js";
+
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-    logRoute(req, res);
+
     let votes = await db.getOne('votes');
     if (votes) {
         return res.status(200).json(votes);

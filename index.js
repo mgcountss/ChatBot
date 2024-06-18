@@ -8,10 +8,10 @@ import cors from 'cors';
 import db from './functions/db.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import {checkLiveChannels} from './functions/checkLiveChannels.js';
-import logRoute from './functions/logRoute.js';
+import { checkLiveChannels } from './functions/checkLiveChannels.js';
 import checkLogin from './functions/checkLogin.js';
 import * as child_process from 'child_process';
+import relativeTime from './functions/relativeTime.js';
 const app = express();
 app.use(cors());
 app.use(cookieParser());
@@ -45,7 +45,6 @@ fs.readdirSync('./public').forEach(async (folder) => {
 });
 
 app.get('/file/:file', async (req, res) => {
-    logRoute(req, res);
     if (req.params.file == 'countup.js' || req.params.file == 'odometer.js' || req.params.file == 'odometer.css') {
         res.sendFile(__dirname + '/web/' + req.params.file);
     } else {
@@ -53,8 +52,9 @@ app.get('/file/:file', async (req, res) => {
     };
 });
 
-app.get('/filestore/:file', checkLogin, async (req, res) => {
-    logRoute(req, res);
+app.get('/filestore/:file', (req, res, next) => {
+    checkLogin(req, res, next, 1);
+}, async (req, res) => {
     let userDir = "./user/files"
     let file = req.params.file;
     let path = userDir + "/" + file;
@@ -69,13 +69,11 @@ app.get('/filestore/:file', checkLogin, async (req, res) => {
 });
 
 /*---------------/main/-----------------*/
-app.get('/', async (req, res) => {
-    logRoute(req, res)
+app.get('/', async (req, res) => {  
     res.sendFile(__dirname + '/web/index.html');
 });
 
 app.get('/dashboard', async (req, res) => {
-    logRoute(req, res)
     let key = ""
     if (req.cookies['chatbot']) {
         key = req.cookies['chatbot']
@@ -96,30 +94,8 @@ app.get('/dashboard', async (req, res) => {
     if (!userAuth) {
         return res.redirect('/connect')
     }
-    let commands = await db.getOne('commands')
-    let connection = await db.getOne('connection')
-    let counting = await db.getOne('counting')
-    let giveaway = await db.getOne('giveaway')
-    let messages = await db.getOne('messages')
-    let quotes = await db.getOne('quotes')
-    let stream = await db.getOne('stream')
-    let timers = await db.getOne('timers')
-    let users = await db.getOne('users')
-    let votes = await db.getOne('votes')
-    let user = {
-        id: connection.channel.id,
-        commands: commands,
-        connection: connection,
-        counting: counting,
-        giveaway: giveaway,
-        messages: messages,
-        quotes: quotes,
-        settings: settings,
-        stream: stream,
-        timers: timers,
-        users: users,
-        votes: votes
-    }
+    let user = await db.returnDB();
+    user.id = user.connection.channel.id;
     let auth = false;
     if (userAuth) {
         auth = true;
@@ -128,7 +104,7 @@ app.get('/dashboard', async (req, res) => {
 });
 
 app.get('/connect', async (req, res) => {
-    logRoute(req, res)
+    
     if (req.cookies['chatbot']) {
         let user = await db.findUserIdFromToken(req.cookies['chatbot']);
         if (user) {
@@ -146,18 +122,18 @@ app.get('/connect', async (req, res) => {
 });
 
 app.get('/login', async (req, res) => {
-    logRoute(req, res)
+    
     res.sendFile(__dirname + '/web/login.html');
 });
 
 app.get('/login/:token', async (req, res) => {
-    logRoute(req, res)
+    
     res.cookie('chatbot', req.params.token, { maxAge: 31556952000 });
     res.redirect('/dashboard')
 });
 
 app.get('/restore', async (req, res) => {
-    logRoute(req, res)
+    
     if (req.cookies['chatbot']) {
         let userID = await db.findUserIdFromToken(req.cookies['chatbot']);
         if (userID) {
@@ -176,18 +152,18 @@ app.get('/restore', async (req, res) => {
 });
 
 app.get('/favicon.ico', async (req, res) => {
-    logRoute(req, res)
+    
     res.sendFile(__dirname + '/web/favicon.ico');
 });
 
 app.get('/default.webp', async (req, res) => {
-    logRoute(req, res)
+    
     res.sendFile(__dirname + '/web/default.webp');
 });
 
 app.post('/restore/:date', async (req, res) => {
     try {
-        logRoute(req, res)
+        
         if (req.cookies['chatbot']) {
             let user = await db.findUserIdFromToken(req.cookies['chatbot']);
             if (user) {
@@ -227,7 +203,7 @@ app.post('/restore/:date', async (req, res) => {
 });
 
 app.post('/connect', async (req, res) => {
-    logRoute(req, res)
+    
     if (req.body.channelID && req.body.botID) {
         let bodyJson;
         let bodyJson2;
@@ -314,14 +290,13 @@ app.post('/connect', async (req, res) => {
             fs.writeFileSync('./user/key.json', JSON.stringify(keys));
             res.cookie('chatbot', token, { maxAge: 31556952000, httpOnly: true });
             await db.syncDBToFiles();
-            //make a new child process of an electron instance of /functions/login.js
             child_process.exec('electron ./functions/login.js', (err, stdout, stderr) => {
                 if (err) {
                     console.log(err);
                 }
                 console.log(stdout);
             });
-            
+
             res.send({
                 success: true
             })
@@ -340,118 +315,10 @@ app.post('/connect', async (req, res) => {
 });
 
 app.get('/logout', async (req, res) => {
-    logRoute(req, res)
+    
     res.clearCookie('chatbot');
     res.redirect('/');
 });
-
-function calculateDifference(dailyStats, key, daysAgo, currencyLength) {
-    try {
-        let toReturn = parseFloat(Object.values(dailyStats)[currencyLength - 1][key]) - parseFloat(Object.values(dailyStats)[currencyLength - daysAgo][key]);
-        if (isNaN(toReturn)) {
-            return 0;
-        } else {
-            return toReturn;
-        }
-    } catch (err) {
-        return 0;
-    }
-}
-
-function calculateDaily(user) {
-    try {
-        user.daily = {
-            points: calculateDifference(user.dailyStats, 'points', 2, Object.keys(user.dailyStats).length),
-            messages: calculateDifference(user.dailyStats, 'messages', 2, Object.keys(user.dailyStats).length),
-            xp: calculateDifference(user.dailyStats, 'xp', 2, Object.keys(user.dailyStats).length),
-        };
-    } catch (err) { }
-}
-
-function calculateWeekly(user) {
-    try {
-        user.weekly = {
-            points: calculateDifference(user.dailyStats, 'points', 8, Object.keys(user.dailyStats).length),
-            messages: calculateDifference(user.dailyStats, 'messages', 8, Object.keys(user.dailyStats).length),
-            xp: calculateDifference(user.dailyStats, 'xp', 8, Object.keys(user.dailyStats).length),
-        };
-    } catch (err) { }
-}
-
-function calculateMonthly(user) {
-    try {
-        user.monthly = {
-            points: calculateDifference(user.dailyStats, 'points', 31, Object.keys(user.dailyStats).length),
-            messages: calculateDifference(user.dailyStats, 'messages', 31, Object.keys(user.dailyStats).length),
-            xp: calculateDifference(user.dailyStats, 'xp', 31, Object.keys(user.dailyStats).length),
-        };
-    } catch (err) { }
-}
-
-function resetIfInactive(user) {
-    const currentTime = Date.now() * 1000;
-    if (user.lastMSG) {
-        if (currentTime - user.lastMSG > 86400000000) {
-            user.daily = { points: 0, messages: 0, xp: 0 };
-        }
-        if (currentTime - user.lastMSG > 604800000000) {
-            user.weekly = { points: 0, messages: 0, xp: 0 };
-        }
-        if (currentTime - user.lastMSG > 2592000000000) {
-            user.monthly = { points: 0, messages: 0, xp: 0 };
-        }
-    }
-}
-
-function relativeTime(previous) {
-    if (previous === 0) {
-        return "never"
-    }
-    previous = parseInt(previous) / 1000;
-    const date = new Date();
-    const timestamp = date.getTime();
-    previous = Math.floor(previous / 1000)
-    const difference = Math.floor(timestamp / 1000) - previous;
-    let output = ``;
-    if (difference < 60) {
-        if (difference === 1) {
-            output = `${difference} second ago`;
-        } else {
-            output = `${difference} seconds ago`;
-        }
-    } else if (difference < 3600) {
-        if (difference === 1) {
-            output = `${Math.floor(difference / 60)} minute ago`;
-        } else {
-            output = `${Math.floor(difference / 60)} minutes ago`;
-        }
-    } else if (difference < 86400) {
-        if (difference === 1) {
-            output = `${Math.floor(difference / 3600)} hour ago`;
-        } else {
-            output = `${Math.floor(difference / 3600)} hours ago`;
-        }
-    } else if (difference < 2620800) {
-        if (difference === 1) {
-            output = `${Math.floor(difference / 86400)} day ago`;
-        } else {
-            output = `${Math.floor(difference / 86400)} days ago`;
-        }
-    } else if (difference < 31449600) {
-        if (difference === 1) {
-            output = `${Math.floor(difference / 2620800)} month ago`;
-        } else {
-            output = `${Math.floor(difference / 2620800)} months ago`;
-        }
-    } else {
-        if (difference === 1) {
-            output = `${Math.floor(difference / 31449600)} year ago`;
-        } else {
-            output = `${Math.floor(difference / 31449600)} years ago`;
-        }
-    }
-    return output;
-}
 
 function restoreLastBackup() {
     let backups = fs.readdirSync('./user/archives');
@@ -473,30 +340,7 @@ function restoreLastBackup() {
     fs.writeFileSync('./user/db/votes.json', JSON.stringify(json.votes));
 }
 
-async function cachePublic() {
-    try {
-        let users = await db.getOne('users');
-        users = [...users]
-        users = JSON.parse(JSON.stringify(users));
-        for (let i = 0; i < users.length; i++) {
-            calculateDaily(users[i]);
-            calculateWeekly(users[i]);
-            calculateMonthly(users[i]);
-            resetIfInactive(users[i]);
-            delete users[i].hourlyStats;
-            delete users[i].warns;
-            delete users[i].allWarns;
-            delete users[i].cooldown;
-        }
-        fs.writeFileSync('./user/publicCurrencyCache.json', JSON.stringify(users));
-    } catch (err) {
-        console.log(err);
-    }
-}
-
-cachePublic();
 checkLiveChannels();
-setInterval(cachePublic, 10000);
 
 app.listen(8080, () => {
     console.log('Server started: http://localhost:8080');

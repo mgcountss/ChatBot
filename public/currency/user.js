@@ -1,6 +1,6 @@
 import express from "express";
 import db from "../../functions/db.js";
-import logRoute from "../../functions/logRoute.js";
+
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 const router = express.Router();
@@ -8,7 +8,7 @@ let __filename = fileURLToPath(import.meta.url);
 let __dirname = dirname(__filename).split('\\public\\currency')[0];
 
 router.get('/', async (req, res) => {
-    logRoute(req, res)
+    
     try {
         if (req.query.id) {
             let currency = await db.getOne('users');

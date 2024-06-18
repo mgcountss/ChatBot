@@ -1,10 +1,9 @@
 import express from "express";
 import db from "../../functions/db.js";
-import logRoute from "../../functions/logRoute.js";
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-    logRoute(req, res);
+
     let sort = req.query.type;
     if (req.query.sort) {
         sort = req.query.sort;

@@ -1,10 +1,11 @@
 import express from "express";
 import db from "../../functions/db.js";
-import logRoute from "../../functions/logRoute.js";
+import {calculateUser} from '../../functions/calculate.js';
+
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-    logRoute(req, res)
+    
     let currency = await db.getOne('users');
     currency = [...currency];
     try {
@@ -76,69 +77,7 @@ router.post('/', async (req, res) => {
                             xp: user.xp
                         }
                     }
-                    let dailyKeys = Object.keys(user.dailyStats);
-                    try {
-                        user.daily = {
-                            points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].points),
-                            messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].messages),
-                            xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 2]].xp)
-                        }
-                    } catch (err) {
-                        user.daily = {
-                            points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
-                            messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
-                            xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
-                        }
-                    }
-                    try {
-                        user.weekly = {
-                            points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].points),
-                            messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].messages),
-                            xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 8]].xp)
-                        }
-                    } catch (err) {
-                        user.weekly = {
-                            points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
-                            messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
-                            xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
-                        }
-                    }
-                    try {
-                        user.monthly = {
-                            points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].points),
-                            messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].messages),
-                            xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 31]].xp)
-                        }
-                    } catch (err) {
-                        user.monthly = {
-                            points: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].points) - parseFloat(user.dailyStats[dailyKeys[0]].points),
-                            messages: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].messages) - parseFloat(user.dailyStats[dailyKeys[0]].messages),
-                            xp: parseFloat(user.dailyStats[dailyKeys[dailyKeys.length - 1]].xp) - parseFloat(user.dailyStats[dailyKeys[0]].xp)
-                        }
-                    }
-                    if (user.lastMSG) {
-                        if ((Date.now() * 1000) - (user.lastMSG) > 86400000000) {
-                            user.daily = {
-                                points: 0,
-                                messages: 0,
-                                xp: 0
-                            }
-                        }
-                        if ((Date.now() * 1000) - (user.lastMSG) > 604800000000000) {
-                            user.weekly = {
-                                points: 0,
-                                messages: 0,
-                                xp: 0
-                            }
-                        }
-                        if ((Date.now() * 1000) - (user.lastMSG) > 2592000000000) {
-                            user.monthly = {
-                                points: 0,
-                                messages: 0,
-                                xp: 0
-                            }
-                        }
-                    }
+                    user = calculateUser(user);
                     delete user.dailyStats;
                     delete user.warns;
                     delete user.cooldown;

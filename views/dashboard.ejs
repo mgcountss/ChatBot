@@ -1089,7 +1089,7 @@
                     pop.innerHTML = `
                                 <div class="popup-content">
                                     <img src="${id}" style="width: 50px; height: 50px; border-radius: 50%;"><br>
-                                    <input type="text" id="photo" value="${id}"><button onclick="updateUser('photo', '${id}')">Update</button><br>
+                                    <input type="text" id="photo" value="${user.photo}"><button onclick="updateUser('photo', '${id}')">Update</button><br>
                                     <p>Name: <input type="text" id="name" value="${user.name}"><button onclick="updateUser('name', '${id}')">Update</button></p>
                                     <p>User ID: <input type="text" id="id" value="${id}"></p>
                                     <p>Last MSG: <input type="text" id="lastMsg" value="${relativeTime(user.lastMSG)} (${new Date(parseFloat(user.lastMSG))})"></p>

@@ -1,10 +1,10 @@
 import express from "express";
 import db from "../../functions/db.js";
-import logRoute from "../../functions/logRoute.js";
+
 const router = express.Router();
 
-router.post("/", async (req, res) => {
-    logRoute(req, res);
+router.get("/", async (req, res) => {
+    try {
     let users = await db.getOne('users');
     let stream = await db.getOne('stream');
     let votes = await db.getOne('votes');
@@ -18,12 +18,12 @@ router.post("/", async (req, res) => {
             votes: 0
         };
         for (let i = 0; i < users.length; i++) {
-            points += parseFloat(users[i].points);
-            hours += parseFloat(users[i].hours);
-            xp += parseFloat(users[i].xp);
+            stats.points += parseFloat(users[i].points);
+            stats.hours += parseFloat(users[i].hours);
+            stats.xp += parseFloat(users[i].xp);
         }
         for (let i = 0; i < votes.length; i++) {
-            voteCount += parseFloat(votes[i].votes);
+            stats.voteCount += parseFloat(votes[i].votes);
         }
         return res.status(200).json(stats);
     } else {
@@ -32,6 +32,13 @@ router.post("/", async (req, res) => {
             error: true
         });
     };
+} catch (error) {
+    console.error(error);
+    return res.status(500).json({
+        message: 'Internal server error.',
+        error: true
+    });
+}
 });
 
 export default router;
